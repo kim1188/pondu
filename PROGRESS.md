@@ -90,3 +90,4 @@ iOS 네 흐름은 충돌 없이 합쳐졌고 Swift 파일은 90여 개다. 타�
 | 2026-11-22 | XcodeGen 2.48.0 실행 종료 코드 137, 이후 실행 파일 소실 | 공식 아카이브 체크섬은 일치했다. `project.yml`을 기준으로 로컬 Xcode 프로젝트를 별도로 만들었다 | 원인 미확인 |
 | 2026-11-22 | iPhone 17 시뮬레이터 빌드, 빌드 후 실행 요청이 각각 300초 뒤 시간 초과 | 두 로그에 Xcode 호출과 빌드 설정이 남았다. 별도 `xcodebuild`에서 SwiftPM 캐시 접근 오류와 CoreSimulator 연결 거부를 확인했다. 캐시를 임시 경로로 바꾼 `swift package resolve`도 매니페스트 샌드박스 적용 권한 오류로 종료됐다 | 시간 초과 원인 미확인 |
 | 2026-11-23 | Xcode에서 프로젝트 열기 지연, Xcode·Finder 자동 조작 시간 초과 | `~/Documents`에 iCloud File Provider 연결 흔적이 있다. `/private/tmp` 사본이 Xcode GUI에서 열렸고 의존성 다운로드와 앱 빌드가 진행됐다 | 원본 경로의 지연 원인 미확인 |
+| 2026-11-23 | Mac에서 Device Hub 27.2가 창을 열다 종료되고 창 복원 안내가 표시됨 | `[로컬]` iPhone 17의 iOS 27.0·27.2에서 Pondu 이메일 입력 화면을 캡처했다. Mac의 Device Hub 충돌 보고서에는 `SimulatorKit`의 `AXPTranslator` 예외가 남았다. macOS는 27.2 초기 베타 `26B5086k`다 | Mac에서 Device Hub 창 복구 대기 |
