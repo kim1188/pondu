@@ -8,6 +8,7 @@ create index if not exists sessions_user_started_id_idx on sessions (user_id, st
 create index if not exists sessions_user_thread_started_idx on sessions (user_id, thread_id, started_at desc, id desc)
   where thread_id is not null;
 -- 예약 작업이 보는 진행 중 세션.
+create index if not exists plan_blocks_planned_end_idx on plan_blocks (end_at) where status = 'planned';
 create index if not exists sessions_active_idx on sessions (status) where status in ('live', 'paused');
 
 -- ── 변경 방지 트리거 ──
@@ -191,6 +192,7 @@ declare
   v_joined sessions;
   v_constraint text;
   v_tmp uuid;
+  v_owner uuid;
 begin
   if v_uid is null then
     raise exception using errcode = 'P0001', message = 'not_authenticated';
@@ -224,19 +226,23 @@ begin
     raise exception using errcode = 'P0001', message = 'session_already_active';
   end if;
 
-  -- 연결 대상은 모두 내 것이어야 한다. 비어 있는 쪽은 연결된 쪽에서 채운다.
+  -- 연결 대상은 모두 내 것이어야 한다(남의 것이면 forbidden, 없으면 not_found). 비어 있는 쪽은 연결된 쪽에서 채운다.
   if v_block is not null then
-    select todo_id, coalesce(v_thread, thread_id) into v_tmp, v_thread
-      from plan_blocks where id = v_block and user_id = v_uid;
+    select user_id, todo_id, coalesce(v_thread, thread_id) into v_owner, v_tmp, v_thread
+      from plan_blocks where id = v_block;
     if not found then raise exception using errcode = 'P0001', message = 'not_found'; end if;
+    if v_owner <> v_uid then raise exception using errcode = 'P0001', message = 'forbidden'; end if;
     v_todo := coalesce(v_todo, v_tmp);
   end if;
   if v_todo is not null then
-    select coalesce(v_thread, thread_id) into v_thread from todos where id = v_todo and user_id = v_uid;
+    select user_id, coalesce(v_thread, thread_id) into v_owner, v_thread from todos where id = v_todo;
     if not found then raise exception using errcode = 'P0001', message = 'not_found'; end if;
+    if v_owner <> v_uid then raise exception using errcode = 'P0001', message = 'forbidden'; end if;
   end if;
-  if v_thread is not null and not exists (select 1 from threads where id = v_thread and user_id = v_uid) then
-    raise exception using errcode = 'P0001', message = 'not_found';
+  if v_thread is not null then
+    select user_id into v_owner from threads where id = v_thread;
+    if not found then raise exception using errcode = 'P0001', message = 'not_found'; end if;
+    if v_owner <> v_uid then raise exception using errcode = 'P0001', message = 'forbidden'; end if;
   end if;
 
   -- 같이 하기: 상대 세션이 진행 중이고 내가 볼 수 있어야 한다.
@@ -291,7 +297,7 @@ begin
   if p_joined_session_id is not null then
     insert into notification_outbox (user_id, kind, payload)
     values (v_joined.user_id, 'joined',
-            jsonb_build_object('session_id', v_row.id, 'joined_session_id', p_joined_session_id, 'user_id', v_uid));
+            jsonb_build_object('session_id', v_row.id, 'user_id', v_uid));
   end if;
   return session_json(v_row);
 end $$;
@@ -303,6 +309,7 @@ declare
 begin
   if auth.uid() is null then raise exception using errcode = 'P0001', message = 'not_authenticated'; end if;
   v := b_my_session_locked(p_session_id);
+  if v.status = 'paused' then return session_json(v); end if; -- 재시도
   if v.status <> 'live' then
     raise exception using errcode = 'P0001', message = 'session_not_active';
   end if;
@@ -318,6 +325,7 @@ declare
 begin
   if auth.uid() is null then raise exception using errcode = 'P0001', message = 'not_authenticated'; end if;
   v := b_my_session_locked(p_session_id);
+  if v.status = 'live' then return session_json(v); end if; -- 재시도
   if v.status <> 'paused' then
     raise exception using errcode = 'P0001', message = 'session_not_active';
   end if;
@@ -344,6 +352,10 @@ begin
     raise exception using errcode = 'P0001', message = 'invalid_input';
   end if;
   v := b_my_session_locked(p_session_id);
+  -- 응답을 못 받고 다시 부른 경우: 이미 끝났으면(또는 종료 요청이 확인 대기로 갔으면) 현재 상태를 그대로 돌려준다.
+  if v.status = 'ended' or (v.status = 'needs_confirmation' and v.outcome is not null) then
+    return session_json(v);
+  end if;
   if v.status not in ('live', 'paused') then
     raise exception using errcode = 'P0001', message = 'session_not_active';
   end if;
@@ -408,7 +420,7 @@ begin
   return session_json(v);
 end $$;
 
--- 사진 경로는 규칙대로만. 끝난 지 오래된 세션에는 붙일 수 없다.
+-- 사진 경로는 규칙대로만. 끝난 지 10분이 지난 세션에는 붙일 수 없다.
 create or replace function attach_session_photo(p_session_id uuid, p_photo_path text, p_thumb_path text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
@@ -423,7 +435,7 @@ begin
      or v.capture_mode <> 'in_app_photo' then
     raise exception using errcode = 'P0001', message = 'invalid_input';
   end if;
-  if v.status = 'ended' and v.ended_at < now() - interval '24 hours' then
+  if v.status = 'ended' and v.ended_at < now() - interval '10 minutes' then
     raise exception using errcode = 'P0001', message = 'session_not_active';
   end if;
   update sessions set photo_path = p_photo_path, photo_thumb_path = coalesce(p_thumb_path, photo_thumb_path)
@@ -514,7 +526,7 @@ begin
   return jsonb_build_object('items', v_items, 'next_cursor', v_next);
 end $$;
 
--- 기록 탭 한 화면. Asia/Seoul 이면 daily_stats 로, 그 밖의 시간대는 끝난 세션에서 직접 계산한다.
+-- 기록 탭 한 화면. 날짜는 Asia/Seoul 기준(daily_stats). 다른 시간대는 invalid_input.
 create or replace function get_record_summary(p_from date, p_to date, p_tz text default 'Asia/Seoul')
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare
@@ -528,27 +540,14 @@ begin
   if p_from is null or p_to is null or p_from > p_to or p_to - p_from > 366 then
     raise exception using errcode = 'P0001', message = 'invalid_input';
   end if;
-  begin
-    perform now() at time zone v_tz;
-  exception when others then
+  if v_tz <> 'Asia/Seoul' then
     raise exception using errcode = 'P0001', message = 'invalid_input';
-  end;
+  end if;
 
   with src as materialized (
     select ds.day, ds.primary_category as category, ds.seconds, ds.session_count as cnt
     from daily_stats ds
-    where v_tz = 'Asia/Seoul' and ds.user_id = v_uid and ds.day between p_from and p_to
-    union all
-    select sp.day, s.primary_category, sum(sp.seconds)::int,
-           (count(*) filter (where sp.day = (s.started_at at time zone v_tz)::date))::int
-    from sessions s
-    cross join lateral b_split_days(s.started_at, s.ended_at,
-      greatest(0, floor(extract(epoch from s.ended_at - s.started_at))::int - s.paused_seconds), v_tz) sp
-    where v_tz <> 'Asia/Seoul' and s.user_id = v_uid and s.status = 'ended'
-      and s.started_at >= (p_from::timestamp at time zone v_tz) - interval '2 days'
-      and s.started_at < ((p_to + 1)::timestamp at time zone v_tz)
-      and sp.day between p_from and p_to
-    group by sp.day, s.primary_category
+    where ds.user_id = v_uid and ds.day between p_from and p_to
   )
   select
     (select coalesce(jsonb_agg(jsonb_build_object('day', d.day, 'seconds', d.sec, 'session_count', d.cnt,
@@ -580,6 +579,7 @@ create or replace function sweep_stale_sessions() returns int
 language plpgsql security definer set search_path = public as $$
 declare
   v_n int;
+  v_m int;
 begin
   with hit as (
     update sessions s set status = 'needs_confirmation'
@@ -591,7 +591,16 @@ begin
     from hit returning 1
   )
   select count(*) into v_n from hit;
-  return v_n;
+
+  -- 끝 시각이 지났는데 시작하지 않은 예정 시간은 놓친 것으로 본다(세션이 연결된 블록은 제외).
+  with miss as (
+    update plan_blocks b set status = 'missed'
+    where b.status = 'planned' and b.end_at < now()
+      and not exists (select 1 from sessions s where s.plan_block_id = b.id)
+    returning 1
+  )
+  select count(*) into v_m from miss;
+  return v_n + v_m;
 end $$;
 
 -- ── 실행 권한 ──

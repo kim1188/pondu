@@ -33,9 +33,9 @@ insert into threads (id, user_id, title, primary_category) values ('11111111-000
 insert into todos (id, user_id, title) values ('22222222-0000-0000-0000-0000000000aa', :'ua', '가의 할 일');
 insert into plan_blocks (id, user_id, start_at, end_at) values ('33333333-0000-0000-0000-0000000000aa', :'ua', now(), now() + interval '1 hour');
 select test_login(:'ub');
-select tt.expect_err(format('select start_session(%L, ''study'', ''no_photo'', ''private'', %L)', gen_random_uuid(), '11111111-0000-0000-0000-0000000000aa'), 'not_found');
-select tt.expect_err(format('select start_session(%L, ''study'', ''no_photo'', ''private'', null, %L)', gen_random_uuid(), '22222222-0000-0000-0000-0000000000aa'), 'not_found');
-select tt.expect_err(format('select start_session(%L, ''study'', ''no_photo'', ''private'', null, null, %L)', gen_random_uuid(), '33333333-0000-0000-0000-0000000000aa'), 'not_found');
+select tt.expect_err(format('select start_session(%L, ''study'', ''no_photo'', ''private'', %L)', gen_random_uuid(), '11111111-0000-0000-0000-0000000000aa'), 'forbidden');
+select tt.expect_err(format('select start_session(%L, ''study'', ''no_photo'', ''private'', null, %L)', gen_random_uuid(), '22222222-0000-0000-0000-0000000000aa'), 'forbidden');
+select tt.expect_err(format('select start_session(%L, ''study'', ''no_photo'', ''private'', null, null, %L)', gen_random_uuid(), '33333333-0000-0000-0000-0000000000aa'), 'forbidden');
 
 -- 가의 세션은 아무 일도 없었다
 select test_login(:'ua');

@@ -81,14 +81,13 @@ end $$;
 -- 요약: daily_stats 경로(Asia/Seoul)와 직접 계산 경로(다른 시간대)가 같은 합계를 낸다
 do $$
 declare
-  a jsonb; b jsonb; total int;
+  a jsonb; total int;
 begin
   a := get_record_summary((now() at time zone 'Asia/Seoul')::date - 3, (now() at time zone 'Asia/Seoul')::date + 1, 'Asia/Seoul');
-  b := get_record_summary((now() at time zone 'Asia/Seoul')::date - 3, (now() at time zone 'Asia/Seoul')::date + 1, 'UTC');
   perform tt.assert(jsonb_array_length(a->'days') >= 1, 'days');
   select coalesce(sum((x->>'seconds')::int), 0) into total from jsonb_array_elements(a->'by_category') x;
   perform tt.assert(total = (select sum((d->>'seconds')::int) from jsonb_array_elements(a->'days') d), 'by_category 합 = days 합');
-  perform tt.assert((select sum((x->>'seconds')::int) from jsonb_array_elements(b->'by_category') x) = total, '다른 시간대 경로도 같은 합계');
+  perform tt.expect_err('select get_record_summary(current_date - 1, current_date, ''UTC'')', 'invalid_input');
   perform tt.assert((select sum((d->>'session_count')::int) from jsonb_array_elements(a->'days') d) = 7, '세션 수 7: ' || a::text);
   perform tt.assert(jsonb_array_length(a->'threads') = 1 and a->'threads'->0->>'title' = '과제', '이어가는 일별 합계');
   perform tt.assert(a->'threads'->0->>'last_at' is not null, 'last_at');

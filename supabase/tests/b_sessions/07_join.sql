@@ -51,3 +51,25 @@ select end_session(:'sq', 'done');
 select start_session(gen_random_uuid(), 'study', 'no_photo', 'friends') ->> 'id' as sr \gset
 select tt.expect_err(format('select start_session(%L, ''study'', ''no_photo'', ''private'', null, null, null, null, null, %L)', gen_random_uuid(), :'sr'), 'session_already_active');
 reset role;
+
+-- 놓친 예정 시간: 끝 시각이 지난 planned 블록은 sweep 이 missed 로, 세션이 연결된 블록은 그대로
+select tt.mk_user('라') as ud \gset
+insert into plan_blocks (id, user_id, start_at, end_at) values
+  ('33333333-0000-0000-0000-0000000000c1', :'ud', now() - interval '3 hours', now() - interval '2 hours'),
+  ('33333333-0000-0000-0000-0000000000c2', :'ud', now() - interval '3 hours', now() - interval '2 hours'),
+  ('33333333-0000-0000-0000-0000000000c3', :'ud', now() + interval '1 hour', now() + interval '2 hours');
+select test_login(:'ud');
+select start_session(gen_random_uuid(), 'study', 'no_photo', 'private', null, null, '33333333-0000-0000-0000-0000000000c2') ->> 'id' as sd \gset
+reset role;
+select sweep_stale_sessions();
+do $$ begin
+  perform tt.assert((select status from plan_blocks where id = '33333333-0000-0000-0000-0000000000c1') = 'missed', '지난 planned → missed');
+  perform tt.assert((select status from plan_blocks where id = '33333333-0000-0000-0000-0000000000c2') = 'planned', '세션이 연결된 블록은 제외');
+  perform tt.assert((select status from plan_blocks where id = '33333333-0000-0000-0000-0000000000c3') = 'planned', '앞으로의 블록은 그대로');
+end $$;
+select test_login(:'ud');
+select end_session(:'sd', 'done');
+reset role;
+do $$ begin perform tt.assert((select status from plan_blocks where id = '33333333-0000-0000-0000-0000000000c2') = 'started', '종료 후 started'); end $$;
+-- joined 알림 payload
+do $$ begin perform tt.assert((select payload ? 'session_id' and payload ? 'user_id' from notification_outbox where kind = 'joined' and user_id = current_setting('t.ua')::uuid limit 1), 'joined payload'); end $$;

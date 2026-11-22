@@ -45,11 +45,13 @@ begin
   perform tt.assert((get_my_live_session())->>'id' = s->>'id', 'live 조회');
 
   -- 잘못된 전이
-  perform tt.expect_err(format('select resume_session(%L)', sid), 'session_not_active');
+  s := resume_session(sid);
+  perform tt.assert(s->>'status' = 'live', '진행 중에 resume 재시도는 현재 세션을 돌려준다');
   s := pause_session(sid);
   perform tt.assert(s->>'status' = 'paused' and s->>'paused_at' is not null, 'pause');
   perform tt.assert((get_my_live_session())->>'status' = 'paused', '정지 중에도 진행 중 세션이다');
-  perform tt.expect_err(format('select pause_session(%L)', sid), 'session_not_active');
+  s2 := pause_session(sid);
+  perform tt.assert(s2->>'status' = 'paused' and s2->>'paused_at' = s->>'paused_at', '정지 중에 pause 재시도는 그대로');
   perform tt.expect_err(format('select start_session(%L, ''coding'')', gen_random_uuid()), 'session_already_active');
   s := resume_session(sid);
   perform tt.assert(s->>'status' = 'live' and s->>'paused_at' is null, 'resume');
@@ -60,7 +62,8 @@ begin
   s := end_session(sid, 'more', '여기까지');
   perform tt.assert(s->>'status' = 'ended' and s->>'ended_at' is not null, 'end');
   perform tt.assert(s->>'outcome' = 'more' and s->>'progress_note' = '여기까지', 'outcome, note');
-  perform tt.expect_err(format('select end_session(%L, ''done'')', sid), 'session_not_active');
+  s2 := end_session(sid, 'stop', '재시도');
+  perform tt.assert(s2 = s, '끝난 세션에 end 재시도는 현재 세션 그대로(값 안 바뀜)');
   perform tt.expect_err(format('select pause_session(%L)', sid), 'session_not_active');
   perform tt.expect_err(format('select resume_session(%L)', sid), 'session_not_active');
   perform tt.expect_err(format('select confirm_end(%L, now())', sid), 'session_not_active');
