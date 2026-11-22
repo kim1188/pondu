@@ -50,13 +50,13 @@ public final class SessionController: SessionControlling {
     private(set) var isBusy = false
 
     // MARK: 의존성
-    @ObservationIgnored private let backend: Backend
-    @ObservationIgnored private let store: PendingStoring
-    @ObservationIgnored private let photoProcessor: PhotoProcessing
-    @ObservationIgnored private let photosDirectory: URL
-    @ObservationIgnored private let now: @Sendable () -> Date
-    @ObservationIgnored private let uptime: @Sendable () -> TimeInterval
-    @ObservationIgnored private let sleeper: @Sendable (TimeInterval) async -> Void
+    private let backend: Backend
+    private let store: PendingStoring
+    private let photoProcessor: PhotoProcessing
+    private let photosDirectory: URL
+    private let now: @Sendable () -> Date
+    private let uptime: @Sendable () -> TimeInterval
+    private let sleeper: @Sendable (TimeInterval) async -> Void
 
     @ObservationIgnored private var pending: PendingState
     @ObservationIgnored private var startTask: Task<Void, Never>?
@@ -320,7 +320,6 @@ public final class SessionController: SessionControlling {
 
     /// get_my_live_session이 종료 확인 필요 세션을 주지 않는 경우를 대비해 최근 목록에서 한 번 찾는다.
     private func findNeedsConfirmation() async throws {
-        struct Row: Decodable { let status: String }
         struct RawPage: Decodable { let items: [SessionPair] }
         let page: RawPage = try await backend.rpc("list_my_sessions", [
             "p_cursor": .null, "p_limit": .number(5), "p_thread_id": .null,
@@ -347,7 +346,7 @@ public final class SessionController: SessionControlling {
             return
         }
         let prev = live
-        var state = LiveState(
+        let state = LiveState(
             clientID: prev?.clientID ?? clientID ?? s.id,
             serverID: s.id,
             category: s.primaryCategory,
@@ -358,7 +357,6 @@ public final class SessionController: SessionControlling {
             startedAt: s.startedAt,
             isOfflineStart: s.offlineStartedAt != nil,
             captureMode: s.captureMode)
-        if state.joinedWithName == nil { state.joinedWithName = nil }
         live = state
         liveSession = pair.dto
         if phase == .needsConfirmation {
