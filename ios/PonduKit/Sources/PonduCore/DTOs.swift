@@ -9,7 +9,7 @@ public struct ProfileCard: Identifiable, Hashable, Codable, Sendable {
     public var avatarPath: String?
     public var departmentName: String?
 
-    public init(id: UUID, handle: String, displayName: String, avatarPath: String? = nil, departmentName: String? = nil) {
+    public init(id: UUID = UUID(), handle: String = "", displayName: String = "", avatarPath: String? = nil, departmentName: String? = nil) {
         self.id = id
         self.handle = handle
         self.displayName = displayName
@@ -28,7 +28,7 @@ public struct Profile: Identifiable, Hashable, Codable, Sendable {
     public var schoolId: UUID
     public var departmentId: UUID?
 
-    public init(id: UUID, handle: String, displayName: String, avatarPath: String? = nil, departmentName: String? = nil, schoolId: UUID, departmentId: UUID? = nil) {
+    public init(id: UUID = UUID(), handle: String = "", displayName: String = "", avatarPath: String? = nil, departmentName: String? = nil, schoolId: UUID = UUID(), departmentId: UUID? = nil) {
         self.id = id
         self.handle = handle
         self.displayName = displayName
@@ -48,7 +48,7 @@ public struct DepartmentDTO: Identifiable, Hashable, Codable, Sendable {
     public var id: UUID
     public var name: String
 
-    public init(id: UUID, name: String) {
+    public init(id: UUID = UUID(), name: String = "") {
         self.id = id
         self.name = name
     }
@@ -62,7 +62,7 @@ public struct SessionDTO: Identifiable, Hashable, Codable, Sendable {
     public var todoId: UUID?
     public var planBlockId: UUID?
     public var joinedSessionId: UUID?
-    public var primaryCategory: Category
+    public var primaryCategory: ActivityCategory
     public var tags: [String]
     public var startedAt: Date
     public var endedAt: Date?
@@ -76,11 +76,11 @@ public struct SessionDTO: Identifiable, Hashable, Codable, Sendable {
     public var photoThumbPath: String?
     public var shareTitle: String?
     public var progressNote: String?
-    public var visibility: Visibility
+    public var visibility: ShareVisibility
     public var endCorrected: Bool
     public var offlineStartedAt: Date?
 
-    public init(id: UUID, userId: UUID, threadId: UUID? = nil, todoId: UUID? = nil, planBlockId: UUID? = nil, joinedSessionId: UUID? = nil, primaryCategory: Category, tags: [String] = [], startedAt: Date, endedAt: Date? = nil, pausedAt: Date? = nil, pausedSeconds: Int = 0, durationSeconds: Int = 0, status: SessionStatus, outcome: SessionOutcome? = nil, captureMode: CaptureMode, photoPath: String? = nil, photoThumbPath: String? = nil, shareTitle: String? = nil, progressNote: String? = nil, visibility: Visibility, endCorrected: Bool = false, offlineStartedAt: Date? = nil) {
+    public init(id: UUID = UUID(), userId: UUID = UUID(), threadId: UUID? = nil, todoId: UUID? = nil, planBlockId: UUID? = nil, joinedSessionId: UUID? = nil, primaryCategory: ActivityCategory = .study, tags: [String] = [], startedAt: Date = Date(), endedAt: Date? = nil, pausedAt: Date? = nil, pausedSeconds: Int = 0, durationSeconds: Int = 0, status: SessionStatus = .live, outcome: SessionOutcome? = nil, captureMode: CaptureMode = .noPhoto, photoPath: String? = nil, photoThumbPath: String? = nil, shareTitle: String? = nil, progressNote: String? = nil, visibility: ShareVisibility = .private, endCorrected: Bool = false, offlineStartedAt: Date? = nil) {
         self.id = id
         self.userId = userId
         self.threadId = threadId
@@ -117,11 +117,11 @@ public struct ThreadDTO: Identifiable, Hashable, Codable, Sendable {
     public var id: UUID
     public var title: String
     public var shareTitle: String?
-    public var primaryCategory: Category
-    public var defaultVisibility: Visibility
+    public var primaryCategory: ActivityCategory
+    public var defaultVisibility: ShareVisibility
     public var archivedAt: Date?
 
-    public init(id: UUID, title: String, shareTitle: String? = nil, primaryCategory: Category, defaultVisibility: Visibility, archivedAt: Date? = nil) {
+    public init(id: UUID = UUID(), title: String = "", shareTitle: String? = nil, primaryCategory: ActivityCategory = .study, defaultVisibility: ShareVisibility = .private, archivedAt: Date? = nil) {
         self.id = id
         self.title = title
         self.shareTitle = shareTitle
@@ -146,7 +146,7 @@ public struct TodoDTO: Identifiable, Hashable, Codable, Sendable {
     public var sourceRef: String?
     public var createdAt: Date
 
-    public init(id: UUID, threadId: UUID? = nil, title: String, dueAt: Date? = nil, dueHasTime: Bool = false, estimateMin: Int? = nil, status: TodoStatus, completedAt: Date? = nil, completionSource: String? = nil, source: String? = nil, sourceRef: String? = nil, createdAt: Date) {
+    public init(id: UUID = UUID(), threadId: UUID? = nil, title: String = "", dueAt: Date? = nil, dueHasTime: Bool = false, estimateMin: Int? = nil, status: TodoStatus = .open, completedAt: Date? = nil, completionSource: String? = nil, source: String? = nil, sourceRef: String? = nil, createdAt: Date = Date()) {
         self.id = id
         self.threadId = threadId
         self.title = title
@@ -173,7 +173,7 @@ public struct PlanBlockDTO: Identifiable, Hashable, Codable, Sendable {
     public var origin: BlockOrigin
     public var status: BlockStatus
 
-    public init(id: UUID, todoId: UUID? = nil, threadId: UUID? = nil, startAt: Date, endAt: Date, locked: Bool = false, origin: BlockOrigin, status: BlockStatus) {
+    public init(id: UUID = UUID(), todoId: UUID? = nil, threadId: UUID? = nil, startAt: Date = Date(), endAt: Date = Date(), locked: Bool = false, origin: BlockOrigin = .user, status: BlockStatus = .planned) {
         self.id = id
         self.todoId = todoId
         self.threadId = threadId
@@ -193,7 +193,7 @@ public struct CrewDTO: Identifiable, Hashable, Codable, Sendable {
     public var memberCount: Int
     public var role: String
 
-    public init(id: UUID, name: String, inviteCode: String, memberCount: Int = 0, role: String) {
+    public init(id: UUID = UUID(), name: String = "", inviteCode: String = "", memberCount: Int = 0, role: String = "") {
         self.id = id
         self.name = name
         self.inviteCode = inviteCode
@@ -209,7 +209,7 @@ public struct CommentDTO: Identifiable, Hashable, Codable, Sendable {
     public var body: String
     public var createdAt: Date
 
-    public init(id: UUID, author: ProfileCard, body: String, createdAt: Date) {
+    public init(id: UUID = UUID(), author: ProfileCard = ProfileCard(), body: String = "", createdAt: Date = Date()) {
         self.id = id
         self.author = author
         self.body = body
@@ -223,7 +223,7 @@ public struct FeedCardDTO: Identifiable, Hashable, Codable, Sendable {
     public var author: ProfileCard
     public var threadId: UUID?
     public var shareTitle: String?
-    public var primaryCategory: Category
+    public var primaryCategory: ActivityCategory
     public var startedAt: Date
     public var endedAt: Date?
     public var status: SessionStatus
@@ -239,7 +239,7 @@ public struct FeedCardDTO: Identifiable, Hashable, Codable, Sendable {
     public var myReaction: String?
     public var commentCount: Int
 
-    public init(sessionId: UUID, author: ProfileCard, threadId: UUID? = nil, shareTitle: String? = nil, primaryCategory: Category, startedAt: Date, endedAt: Date? = nil, status: SessionStatus, durationSeconds: Int = 0, progressNote: String? = nil, photoPath: String? = nil, photoThumbPath: String? = nil, captureMode: CaptureMode, endCorrected: Bool = false, offlineStarted: Bool = false, joinedWith: ProfileCard? = nil, reactionCount: Int = 0, myReaction: String? = nil, commentCount: Int = 0) {
+    public init(sessionId: UUID = UUID(), author: ProfileCard = ProfileCard(), threadId: UUID? = nil, shareTitle: String? = nil, primaryCategory: ActivityCategory = .study, startedAt: Date = Date(), endedAt: Date? = nil, status: SessionStatus = .live, durationSeconds: Int = 0, progressNote: String? = nil, photoPath: String? = nil, photoThumbPath: String? = nil, captureMode: CaptureMode = .noPhoto, endCorrected: Bool = false, offlineStarted: Bool = false, joinedWith: ProfileCard? = nil, reactionCount: Int = 0, myReaction: String? = nil, commentCount: Int = 0) {
         self.sessionId = sessionId
         self.author = author
         self.threadId = threadId
@@ -265,5 +265,35 @@ public struct FeedCardDTO: Identifiable, Hashable, Codable, Sendable {
     public var isLive: Bool { status == .live || status == .paused }
     public var recordBadges: [String] {
         RecordBadge.labels(captureMode: captureMode, endCorrected: endCorrected, offlineStarted: offlineStarted)
+    }
+}
+
+/// list_crew_members의 한 행 (ProfileCard 필드 + role).
+public struct CrewMemberDTO: Identifiable, Hashable, Codable, Sendable {
+    public var id: UUID
+    public var handle: String
+    public var displayName: String
+    public var avatarPath: String?
+    public var departmentName: String?
+    public var role: String
+
+    public init(id: UUID = UUID(), handle: String = "", displayName: String = "", avatarPath: String? = nil, departmentName: String? = nil, role: String = "") {
+        self.id = id
+        self.handle = handle
+        self.displayName = displayName
+        self.avatarPath = avatarPath
+        self.departmentName = departmentName
+        self.role = role
+    }
+}
+
+/// list_friend_requests의 응답.
+public struct FriendRequestsDTO: Hashable, Codable, Sendable {
+    public var incoming: [ProfileCard]
+    public var outgoing: [ProfileCard]
+
+    public init(incoming: [ProfileCard] = [], outgoing: [ProfileCard] = []) {
+        self.incoming = incoming
+        self.outgoing = outgoing
     }
 }

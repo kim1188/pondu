@@ -31,25 +31,23 @@ final class ToolsTests: XCTestCase {
         XCTAssertEqual(counter.current, 2)
     }
 
-    @MainActor
     func testDebouncerRunsOnlyLastAction() async throws {
-        let debouncer = Debouncer(delay: 0.05)
-        var ran: [Int] = []
-        debouncer.schedule { ran.append(1) }
-        debouncer.schedule { ran.append(2) }
-        debouncer.schedule { ran.append(3) }
+        let debouncer = Debouncer(delay: .milliseconds(50))
+        let ran = Locked<[Int]>([])
+        debouncer.schedule { ran.withValue { $0.append(1) } }
+        debouncer.schedule { ran.withValue { $0.append(2) } }
+        debouncer.schedule { ran.withValue { $0.append(3) } }
         try await Task.sleep(nanoseconds: 250_000_000)
-        XCTAssertEqual(ran, [3])
+        XCTAssertEqual(ran.current, [3])
     }
 
-    @MainActor
     func testDebouncerCancelStopsPendingAction() async throws {
-        let debouncer = Debouncer(delay: 0.05)
-        var ran = false
-        debouncer.schedule { ran = true }
+        let debouncer = Debouncer(delay: .milliseconds(50))
+        let ran = Locked(false)
+        debouncer.schedule { ran.withValue { $0 = true } }
         debouncer.cancel()
         try await Task.sleep(nanoseconds: 200_000_000)
-        XCTAssertFalse(ran)
+        XCTAssertFalse(ran.current)
     }
 
     func testWithTimeoutThrowsTimeout() async {

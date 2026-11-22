@@ -24,7 +24,7 @@ public struct ServerEvent: Sendable {
     public let name: String
     public let data: Data
 
-    public init(name: String, data: Data) {
+    public init(name: String = "message", data: Data = Data()) {
         self.name = name
         self.data = data
     }
@@ -39,7 +39,7 @@ public struct ServerEvent: Sendable {
 public struct BackendError: Error, Equatable, Sendable {
     public let code: String
 
-    public init(code: String) {
+    public init(code: String = "unknown") {
         self.code = code
     }
 
@@ -130,7 +130,7 @@ public struct UnavailableAuthService: AuthService {
 
 /// 시작 화면을 부르는 요청.
 public struct StartSessionRequest {
-    public var category: Category?
+    public var category: ActivityCategory?
     public var threadID: UUID?
     public var todoID: UUID?
     public var planBlockID: UUID?
@@ -138,7 +138,7 @@ public struct StartSessionRequest {
     public var joinedSessionID: UUID?
     public var joinedWithName: String?
 
-    public init(category: Category? = nil, threadID: UUID? = nil, todoID: UUID? = nil, planBlockID: UUID? = nil,
+    public init(category: ActivityCategory? = nil, threadID: UUID? = nil, todoID: UUID? = nil, planBlockID: UUID? = nil,
                 title: String? = nil, joinedSessionID: UUID? = nil, joinedWithName: String? = nil) {
         self.category = category
         self.threadID = threadID

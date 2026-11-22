@@ -52,7 +52,7 @@ private struct LoadFailedView: View {
 
     var body: some View {
         VStack(spacing: Theme.Spacing.l) {
-            ErrorRetryView(message: message, retry: retry)
+            ErrorRetryView(message: message, onRetry: retry)
             Button("로그아웃", role: .destructive, action: signOut)
         }
     }

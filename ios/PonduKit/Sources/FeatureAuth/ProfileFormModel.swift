@@ -68,7 +68,7 @@ final class ProfileFormModel {
     init(backend: Backend, profiles: ProfileCache, initial: Profile? = nil, debounceDelay: TimeInterval = 0.3) {
         self.backend = backend
         self.profiles = profiles
-        self.debouncer = Debouncer(delay: debounceDelay)
+        self.debouncer = Debouncer(delay: .milliseconds(Int(debounceDelay * 1000)))
         if let initial { apply(initial) }
     }
 
