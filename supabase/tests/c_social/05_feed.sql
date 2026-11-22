@@ -14,8 +14,11 @@ begin
   insert into todos (id, user_id, thread_id, title) values (todo, fr, th, 'SECRET-TODO-할일');
   insert into plan_blocks (user_id, todo_id, thread_id, start_at, end_at) values (fr, todo, th, now(), now() + interval '1 hour');
   s := c_t_session(fr, 'friends', 'ended', t0, null, th);                -- 공유 제목 없음 → 분야 이름
+  -- 끝난 세션의 정지 시간은 흐름 B의 변경 방지 트리거가 막는다. 준비 데이터를 만드는 동안만 끈다.
+  alter table sessions disable trigger user;
   update sessions set todo_id = todo, progress_note = '진척 메모', photo_path = fr || '/p/full.heic',
     photo_thumb_path = fr || '/p/thumb.heic', capture_mode = 'in_app_photo', paused_seconds = 60 where id = s;
+  alter table sessions enable trigger user;
   s_live := c_t_session(fr2, 'crew', 'live', now() - interval '10 minutes', '실시간 제목');
 
   perform test_login(me);

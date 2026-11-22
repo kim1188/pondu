@@ -1,7 +1,7 @@
 -- 차단(양방향), 신고, 종료 확인 필요 숨김
 do $$
 declare sc uuid := c_t_school(); a uuid := c_t_user('a', sc); b uuid := c_t_user('b', sc); c uuid := c_t_user('c', sc);
-  g uuid := gen_random_uuid(); sa uuid; sb uuid; sc_ uuid; cm uuid; r jsonb; n int;
+  g uuid := gen_random_uuid(); sa uuid; sb uuid; sc_ uuid; cm uuid; r jsonb; n int; pc jsonb;
 begin
   perform c_t_friends(a, b); perform c_t_friends(a, c); perform c_t_friends(b, c);
   insert into groups (id, school_id, name, owner_id, invite_code) values (g, sc, 'g', a, 'C4' || replace(g::text, '-', ''));
@@ -11,6 +11,7 @@ begin
   insert into reactions (session_id, user_id, kind) values (sa, b, 'fire'), (sa, c, 'clap');
   insert into comments (session_id, user_id, body) values (sa, b, '화이팅'), (sa, c, '나도');
 
+  pc := profile_card(c);   -- 내부 함수라 관리자 권한일 때 미리 구해 둔다
   -- 차단 전: 서로 보임
   perform test_login(a);
   assert sb = any (c_t_ids(get_feed(null, 50, null))), '차단 전에는 보임';
@@ -20,7 +21,7 @@ begin
   -- a가 b를 차단
   perform block_user(b);
   perform c_t_err(format('select block_user(%L)', a), 'invalid_input');
-  assert list_friends() = jsonb_build_array(profile_card(c)), '차단하면 친구 해제';
+  assert list_friends() = jsonb_build_array(pc), '차단하면 친구 해제';
   assert not (sb = any (c_t_ids(get_feed(null, 50, null)))), 'a 피드에서 b가 사라짐';
   assert not (sb = any (c_t_ids(get_feed(null, 50, g)))), '크루 피드에서도';
   r := get_feed(null, 50, null);
@@ -41,7 +42,7 @@ begin
   perform c_t_err(format('select add_comment(%L, %L)', sa, 'hi'), 'not_found');
   perform c_t_err(format('select send_friend_request(%L)', a), 'blocked');
   assert (select count(*) from jsonb_array_elements(list_crew_members(g))) = 2, '크루 목록에서 a가 빠짐';
-  assert list_friends() = jsonb_build_array(profile_card(c));
+  assert list_friends() = jsonb_build_array(pc);
   -- c의 세션에 달린 a 흔적도 b에게는 안 보임
   reset role;
   insert into comments (session_id, user_id, body) values (sc_, a, 'a의 말');
@@ -55,7 +56,7 @@ begin
   -- 차단 해제: 다시 보이지만 친구는 아님
   perform test_login(a);
   perform unblock_user(b);
-  assert list_friends() = jsonb_build_array(profile_card(c)), '해제해도 친구는 복구되지 않음';
+  assert list_friends() = jsonb_build_array(pc), '해제해도 친구는 복구되지 않음';
   assert sb = any (c_t_ids(get_feed(null, 50, g))), '해제 후 크루로는 다시 보임';
 
   -- 신고: 신고한 사람에게만 숨겨진다

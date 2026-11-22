@@ -22,7 +22,7 @@ fi
 
 PSQL="psql -X -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -p $PORT -U postgres"
 DB="pondu_test_$$"
-$PSQL -d postgres -c "create database $DB"
+$PSQL -d postgres -c "create database $DB encoding 'UTF8' locale 'C.UTF-8' template template0"
 trap '$PSQL -d postgres -c "drop database if exists $DB" >/dev/null' EXIT
 
 $PSQL -d "$DB" -c "create extension if not exists pgcrypto" -f tests/shim.sql

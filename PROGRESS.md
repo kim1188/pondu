@@ -6,7 +6,9 @@
 
 - [x] PRD, SRD, M0 명세 — `docs/`
 - [x] 공통 계약과 전체 스키마 — `docs/specs/CONTRACT.md`, `supabase/migrations/0001_schema.sql` `[로컬]` 일반 Postgres 16에 적용, 기본 거부 확인
-- [ ] 공통 계약의 맥락 없는 리뷰(설계 비평, 구현 준비도). 병렬 구현을 띄우기 전에 했어야 하는데 건너뛰었다. 지적은 통합 때 반영한다
+- [x] 공통 계약의 맥락 없는 리뷰(설계 비평, 구현 준비도) 각 1명, 2026-11-22 `[코드]`. 병렬 구현을 띄운 뒤에 해서 결정을 `docs/specs/CONTRACT-ADDENDUM.md`로 따로 냈다
+- [ ] 계약 보정 중 아직 코드에 없는 것: S8(초대 코드 재발급), S9(알림 중복 제한, 재요청 제한), S10(재배치 일부 적용 금지), S11(제안 24시간 만료), R13(종료 확인 대기 세션을 `get_my_live_session`이 주는지 확인), R8(`share_title` null), 가져오기 날짜 규칙(앱은 정오, 서버는 23:59)
+- [ ] `supabase/config.toml`: 인증 훅 등록, 인증 코드 6자리·10분·재전송 60초, 초기 데이터 경로. 담당이 없었다. 실제 프로젝트를 만들 때 확인하며 작성한다
 - [ ] 앱 이름 결정. 정해지면 상수 하나로 모은다
 - [ ] 요구사항 번호 정리와 추적표(요구사항 → 흐름 → 테스트)
 
@@ -22,22 +24,22 @@
 
 | 흐름 | 브랜치 | 상태 | 확인 수준 |
 |---|---|---|---|
-| A auth-profile | `ws/a-auth-profile` | 진행 중 | |
-| B sessions | `ws/b-sessions` | 진행 중 | |
-| C social | `ws/c-social` | 진행 중 | |
-| D plan | `ws/d-plan` | 진행 중 | |
-| E functions | `ws/e-functions` | 진행 중 | |
+| A auth-profile | `ws/a-auth-profile` | main에 병합 | `[로컬]` 테스트 6개. 실제 인증 훅 미확인. 학과 29개는 사람 확인 필요 |
+| B sessions | `ws/b-sessions` | main에 병합 | `[로컬]` 테스트 8개. 저장소 정책·예약 작업은 흉내 스키마에서만. 동시 실행 경쟁은 `[코드]` |
+| C social | `ws/c-social` | main에 병합 | `[로컬]` 테스트 8개. 피드 조회 7~17ms(사용자 3천, 세션 15만) |
+| D plan | `ws/d-plan` | main에 병합 | `[로컬]` 테스트 7개 |
+| E functions | `ws/e-functions` | main에 병합 | `[모의]` 가짜 Claude·가짜 APNs로 66개. assistant 진입점만 로컬에서 띄워 `[로컬]`. 실제 API 호출 0회 |
 | F ios-foundation | `ws/f-ios-foundation` | 진행 중 | |
-| G ios-session | `ws/g-ios-session` | 진행 중 | |
-| H ios-together | `ws/h-ios-together` | 진행 중 | |
-| I ios-today | `ws/i-ios-today` | 진행 중 | |
+| G ios-session | `ws/g-ios-session` | 브랜치에 있음 | `[코드]` 빌드·시험 실행 못 함 |
+| H ios-together | `ws/h-ios-together` | 브랜치에 있음 | `[코드]` 빌드·시험 실행 못 함 |
+| I ios-today | `ws/i-ios-today` | 브랜치에 있음 | `[코드]` 빌드·시험 실행 못 함 |
 
 ## 통합 관문
 
 | 관문 | 통과 조건 | 상태 |
 |---|---|---|
-| G1 서버 병합 | A~E 브랜치를 한 브랜치에 합치고 `supabase/tests/run.sh` 전체 통과 | 대기 |
-| G2 흐름 간 연결 | 임시 대역 없이 실제 함수끼리: 세션 시작 → 같이 하기 권한 확인 → 피드 노출 → 제안 적용 | 대기 |
+| G1 서버 병합 | A~E 브랜치를 한 브랜치에 합치고 `supabase/tests/run.sh` 전체 통과 | 통과 `[로컬]` 2026-11-22. 충돌 없이 병합, 36개 통과(UTF-8). 처음에는 3개 실패: 전부 테스트끼리의 간섭(내부 함수를 테스트가 직접 호출, 끝난 세션을 테스트가 수정, 남은 알림 행)이라 테스트를 고침 |
+| G2 흐름 간 연결 | 임시 대역 없이 실제 함수끼리: 세션 시작 → 같이 하기 권한 확인 → 피드 노출 → 제안 적용 | 통과 `[로컬]` 2026-11-22. `supabase/tests/z_integration/01_end_to_end.sql` |
 | G3 서버 리뷰 | 병합본을 맥락 없는 리뷰어가 접근 규칙과 조작 방지 관점으로 검토 | 대기 |
 | G4 iOS 첫 빌드 | Mac에서 프로젝트 생성 후 컴파일. 네 흐름이 서로 보지 않고 썼으므로 오류 수정이 필요하다 | 대기 (Mac 필요) |
 | G5 실제 서버 연결 | Supabase 프로젝트에 마이그레이션 적용, 앱에서 가입부터 세션 종료까지 | 대기 (프로젝트 필요) |

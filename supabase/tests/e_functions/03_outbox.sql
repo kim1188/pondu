@@ -4,10 +4,12 @@ declare
   s uuid := gen_random_uuid(); a uuid := gen_random_uuid(); b uuid := gen_random_uuid();
   r jsonb; ids bigint[]; n int;
 begin
+  -- 앞선 테스트가 남긴 알림은 보낸 것으로 치운다(병합 후 한 DB에서 이어서 돈다)
+  update notification_outbox set sent_at = now() where sent_at is null;
   insert into schools (id, name, email_domains) values (s, '테스트대', '{test.ac.kr}');
   insert into auth.users (id, email) values (a, a::text || '@test.ac.kr'), (b, b::text || '@test.ac.kr');
   insert into profiles (id, school_id, handle, display_name) values (a, s, 'a_' || substr(a::text, 1, 8), '가은'), (b, s, 'b_' || substr(b::text, 1, 8), 'B');
-  insert into device_tokens (user_id, token) values (a, 'tok-a1'), (a, 'tok-a2');
+  insert into device_tokens (user_id, token) values (a, 'tok-a1-' || a), (a, 'tok-a2-' || a);
 
   insert into notification_outbox (user_id, kind, payload) values
     (a, 'reaction', jsonb_build_object('actor_id', b::text, 'session_id', gen_random_uuid()::text)),
@@ -33,7 +35,7 @@ begin
   update notification_outbox set claimed_at = null;
   assert notification_outbox_claim(10) = '[]'::jsonb, '보낸 건이 다시 집힘';
 
-  assert device_tokens_remove(array['tok-a1', 'nope']) = 1, '토큰 삭제 수가 틀림';
+  assert device_tokens_remove(array['tok-a1-' || a, 'nope']) = 1, '토큰 삭제 수가 틀림';
   select count(*) into n from device_tokens where user_id = a;
   assert n = 1, '토큰이 남아 있어야 함';
 end $$;
