@@ -72,12 +72,12 @@ begin
   assert public.is_handle_available(repeat('a', 20)) = true, '20자는 허용';
   assert public.is_handle_available('abc') = true, '3자는 허용';
   perform public.a_expect_err($q$select public.upsert_my_profile(null, 'C', null)$q$, 'handle_invalid');
-  -- 이름 규칙
+  -- 이름 규칙 (테스트용 클러스터가 SQL_ASCII 라 글자 수 경계는 ASCII 로 확인한다)
   perform public.a_expect_err($q$select public.upsert_my_profile('carol', '', null)$q$, 'invalid_input');
   perform public.a_expect_err($q$select public.upsert_my_profile('carol', '   ', null)$q$, 'invalid_input');
   perform public.a_expect_err($q$select public.upsert_my_profile('carol', null, null)$q$, 'invalid_input');
-  perform public.a_expect_err(format('select public.upsert_my_profile(''carol'', %L, null)', repeat('가', 21)), 'invalid_input');
-  p := public.upsert_my_profile('carol', repeat('가', 20), null);   -- 20자는 허용
+  perform public.a_expect_err(format('select public.upsert_my_profile(''carol'', %L, null)', repeat('x', 21)), 'invalid_input');
+  p := public.upsert_my_profile('carol', repeat('x', 20), null);   -- 20자는 허용
   -- 없는 학과, 다른 학교 학과
   perform public.a_expect_err($q$select public.upsert_my_profile('carol', 'C', gen_random_uuid())$q$, 'invalid_input');
   reset role;
@@ -95,24 +95,22 @@ begin
   reset role;
 end $$;
 
--- 로그인 안 한 요청은 모든 함수에서 not_authenticated
-select test_anon();
-reset role;
-do $$
+-- uid 가 없는 요청은 모든 함수에서 not_authenticated (실행 권한은 있는 역할로)
+do $t$
 declare f text;
 begin
   perform set_config('request.jwt.claim.sub', '', false);
   perform set_config('request.jwt.claim.role', 'authenticated', false);
-  set role authenticated;   -- 권한은 있지만 uid 가 없는 경우
+  set role authenticated;
   foreach f in array array[
-    'select public.get_my_profile()', $$select public.is_handle_available('abc')$$,
-    $$select public.upsert_my_profile('abc','x',null)$$, 'select public.list_departments()',
-    $$select public.search_profiles('a', 10)$$, $$select public.register_device_token('t')$$
+    'select public.get_my_profile()', 'select public.is_handle_available(''abc'')',
+    'select public.upsert_my_profile(''abc'',''x'',null)', 'select public.list_departments()',
+    'select public.search_profiles(''a'', 10)', 'select public.register_device_token(''t'')'
   ] loop
     perform public.a_expect_err(f, 'not_authenticated');
   end loop;
   reset role;
-end $$;
+end $t$;
 -- 메일 도메인 없는 사용자(예: 훅 우회로 만들어진 행)는 프로필을 만들 수 없다
 do $$
 declare ux uuid := 'a0000000-0000-4000-8000-0000000000e1';

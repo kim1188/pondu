@@ -27,7 +27,7 @@ insert into blocks (blocker_id, blocked_id) values
 do $$
 declare
   me uuid := 'a0000000-0000-4000-8000-000000000101';
-  r jsonb; hs text[]; i int;
+  r jsonb; hs text[];
 begin
   perform test_login(me);
 
