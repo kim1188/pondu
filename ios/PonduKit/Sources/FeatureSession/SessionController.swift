@@ -106,6 +106,7 @@ public final class SessionController: SessionControlling {
         draft = d
         route = .start
         Task { [backend] in await d.loadThreads(using: backend) }
+        Task { [backend] in await d.loadCrews(using: backend) }
     }
 
     func cancelStart() {
@@ -131,7 +132,7 @@ public final class SessionController: SessionControlling {
 
     /// 시작을 누른다. 서버 응답을 기다리지 않고 바로 진행 중 화면으로 바꾼다.
     func commitStart() {
-        guard let d = draft, let category = d.category, !d.isProcessingPhoto, live == nil else { return }
+        guard let d = draft, let category = d.category, !d.isProcessingPhoto, d.hasValidCrewChoice, live == nil else { return }
         let title = d.shareTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasPhoto = d.photo != nil
         let p = PendingStart(
@@ -139,6 +140,7 @@ public final class SessionController: SessionControlling {
             category: category,
             captureMode: hasPhoto ? "in_app_photo" : "no_photo",
             visibility: d.visibility.rawValue,
+            groupID: d.resolvedGroupID,
             threadID: d.threadID,
             todoID: d.todoID,
             planBlockID: d.planBlockID,
@@ -372,7 +374,8 @@ public final class SessionController: SessionControlling {
             startedAt: s.startedAt,
             isOfflineStart: s.offlineStartedAt != nil,
             captureMode: s.captureMode,
-            todoID: prev?.todoID)
+            // 앱을 껐다 켠 뒤 서버에서 받은 세션은 prev가 없으므로 서버가 준 todo_id를 쓴다.
+            todoID: prev?.todoID ?? pair.dto.todoId)
         live = state
         liveSession = pair.dto
         if phase == .needsConfirmation {

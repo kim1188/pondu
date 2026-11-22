@@ -7,6 +7,8 @@ struct PendingStart: Codable, Equatable, Identifiable {
     var category: String
     var captureMode: String
     var visibility: String
+    /// 크루 공개일 때만 있다. 이 필드가 생기기 전에 저장된 대기열에는 없으므로 옵셔널이다.
+    var groupID: UUID?
     var threadID: UUID?
     var todoID: UUID?
     var planBlockID: UUID?
@@ -27,6 +29,7 @@ struct PendingStart: Codable, Equatable, Identifiable {
             "p_primary_category": .string(category),
             "p_capture_mode": .string(captureMode),
             "p_visibility": .string(visibility),
+            "p_group_id": uuid(groupID),
             "p_thread_id": uuid(threadID),
             "p_todo_id": uuid(todoID),
             "p_plan_block_id": uuid(planBlockID),

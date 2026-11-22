@@ -90,16 +90,18 @@ enum Fixture {
 
     static func session(id: String = sessionID, status: String = "live", category: String = "study",
                         startedAt: String = "2026-11-22T01:00:00Z", pausedAt: String? = nil,
-                        pausedSeconds: Int = 0, duration: Int = 0, outcome: String? = nil,
-                        captureMode: String = "no_photo", offlineStartedAt: String? = nil) -> [String: Any] {
+                        pausedSeconds: Int = 0, duration: Int? = 0, outcome: String? = nil,
+                        captureMode: String = "no_photo", offlineStartedAt: String? = nil,
+                        todoID: String? = nil, groupID: String? = nil) -> [String: Any] {
         [
-            "id": id, "user_id": userID, "thread_id": NSNull(), "todo_id": NSNull(), "plan_block_id": NSNull(),
+            "id": id, "user_id": userID, "thread_id": NSNull(), "todo_id": todoID as Any? ?? NSNull(), "plan_block_id": NSNull(),
             "joined_session_id": NSNull(), "primary_category": category, "tags": [String](),
             "started_at": startedAt, "ended_at": NSNull(), "paused_at": pausedAt as Any? ?? NSNull(),
-            "paused_seconds": pausedSeconds, "duration_seconds": duration, "status": status,
+            "paused_seconds": pausedSeconds, "duration_seconds": duration as Any? ?? NSNull(), "status": status,
             "outcome": outcome as Any? ?? NSNull(), "capture_mode": captureMode, "photo_path": NSNull(),
             "photo_thumb_path": NSNull(), "share_title": NSNull(), "progress_note": NSNull(), "visibility": "private",
             "end_corrected": false, "offline_started_at": offlineStartedAt as Any? ?? NSNull(),
+            "group_id": groupID as Any? ?? NSNull(),
         ]
     }
 }

@@ -119,5 +119,8 @@ final class TodayModelTests: XCTestCase {
     func testEstimateNoteSkippedNearOne() {
         XCTAssertNil(TodayLogic.estimateNote(categoryRaw: "study", estimateMin: 60, factors: ["study": 1.02]))
         XCTAssertNil(TodayLogic.estimateNote(categoryRaw: "study", estimateMin: 60, factors: [:]))
+        // 기기에 저장한 값을 키 변환 디코더로 다시 읽으면 분야 키가 camelCase가 된다. 그래도 찾아야 한다.
+        XCTAssertEqual(TodayLogic.estimateNote(categoryRaw: "venture_research_intern", estimateMin: 60, factors: ["ventureResearchIntern": 2.0]),
+                       "창업·연구·인턴는 평소 2.0배 걸려서 60분으로 잡았어요")
     }
 }

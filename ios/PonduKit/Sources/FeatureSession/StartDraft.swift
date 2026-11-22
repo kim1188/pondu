@@ -10,6 +10,7 @@ struct ThreadChoice: Decodable, Identifiable, Equatable {
     var primaryCategory: String
     var defaultVisibility: String
     var archivedAt: Date?
+    var defaultGroupId: UUID?
 }
 
 /// 시작 화면 상태. 서버 호출 없이 화면 값만 들고 있다가 시작을 누르면 컨트롤러가 가져간다.
@@ -28,6 +29,11 @@ final class StartDraft {
     var displayTitle: String?
     var shareTitle: String = ""
     var visibility: ShareTarget = .private
+
+    /// 크루로 공개할 때 고르는 크루. `list_my_crews`로 받은 내 크루 중 하나다.
+    var groupID: UUID?
+    var crews: [CrewDTO] = []
+    var crewsLoaded = false
 
     var threads: [ThreadChoice] = []
     var threadsLoading = true
@@ -51,14 +57,46 @@ final class StartDraft {
         visibility = request.joinedSessionID == nil ? .private : .friends
     }
 
-    var canStart: Bool { category != nil && !isProcessingPhoto }
+    var canStart: Bool { category != nil && !isProcessingPhoto && hasValidCrewChoice }
+
+    /// 고를 수 있는 공개 대상. 내 크루가 없으면 `크루`는 숨긴다.
+    var availableTargets: [ShareTarget] {
+        ShareTarget.allCases.filter { $0 != .crew || !crews.isEmpty }
+    }
+
+    /// 서버로 보낼 크루 id. 크루 공개가 아니면 nil. 크루가 하나뿐이면 자동으로 그 크루, 여럿이면 고른 크루.
+    var resolvedGroupID: UUID? {
+        guard visibility == .crew else { return nil }
+        if let groupID, crews.contains(where: { $0.id == groupID }) { return groupID }
+        return crews.count == 1 ? crews[0].id : nil
+    }
+
+    /// 크루 공개인데 크루를 아직 못 정했으면 시작할 수 없다.
+    var hasValidCrewChoice: Bool { visibility != .crew || resolvedGroupID != nil }
 
     func selectThread(_ id: UUID?) {
         threadID = id
         guard let id, let t = threads.first(where: { $0.id == id }) else { return }
         category = t.primaryCategory
         visibility = ShareTarget(rawValue: t.defaultVisibility) ?? .private
+        groupID = t.defaultGroupId
         shareTitle = t.shareTitle ?? ""
+        normalizeVisibility()
+    }
+
+    /// 크루가 없는데 크루 공개가 골라져 있으면 친구 공개로 바꾼다.
+    private func normalizeVisibility() {
+        if crewsLoaded, crews.isEmpty, visibility == .crew { visibility = .friends }
+    }
+
+    func loadCrews(using backend: Backend) async {
+        do {
+            crews = try await backend.rpc("list_my_crews", [:])
+        } catch {
+            crews = []
+        }
+        crewsLoaded = true
+        normalizeVisibility()
     }
 
     func loadThreads(using backend: Backend) async {
@@ -70,8 +108,12 @@ final class StartDraft {
             // 요청으로 넘어온 이어가는 일이면 기본값을 채운다(사용자가 이미 바꾼 값은 두기).
             if let id = threadID, let t = threads.first(where: { $0.id == id }) {
                 if category == nil { category = t.primaryCategory }
-                if joinedSessionID == nil { visibility = ShareTarget(rawValue: t.defaultVisibility) ?? visibility }
+                if joinedSessionID == nil {
+                    visibility = ShareTarget(rawValue: t.defaultVisibility) ?? visibility
+                    groupID = t.defaultGroupId
+                }
                 if shareTitle.isEmpty { shareTitle = t.shareTitle ?? "" }
+                normalizeVisibility()
             }
         } catch {
             threadsFailed = true

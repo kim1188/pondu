@@ -70,7 +70,7 @@ private struct EmailStepView: View {
             Button(action: send) {
                 HStack(spacing: Theme.Spacing.s) {
                     if model.isSendingCode { ProgressView().tint(.white) }
-                    Text(model.isSendingCode ? "보내는 중…" : "인증 코드 받기")
+                    Text(model.isSendingCode ? "보내는 중…" : "코드 받기")
                         .font(Theme.Font.headline)
                 }
                 .frame(maxWidth: .infinity)

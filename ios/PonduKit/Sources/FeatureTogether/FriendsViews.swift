@@ -75,7 +75,7 @@ struct FriendsView: View {
         case .loading:
             Section { ForEach(0..<4, id: \.self) { _ in PersonRowPlaceholder() } }.skeleton(true)
         case .failed:
-            TogetherRetryView(message: "친구 목록을 불러오지 못했어요.") { Task { await model.load() } }
+            ErrorRetryView(message: "친구 목록을 불러오지 못했어요.") { Task { await model.load() } }
         case .ready:
             if model.hasNoRelations {
                 Section {

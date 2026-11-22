@@ -13,20 +13,24 @@ final class ImportTests: XCTestCase {
         XCTAssertEqual(rows.map(\.isSelected), [true, false, false])
     }
 
-    func testPayloadContainsOnlySelectedWithDueRules() {
+    func testPayloadSendsDueDateAndDueTimeAsIs() {
         var rows = ImportLogic.rows(from: [
             cand("날짜만", ref: "r1", date: "2026-11-25"),
             cand("시각까지", ref: "r2", date: "2026-11-25", time: "14:30", done: true),
             cand("뺄 것", ref: "r3"),
         ], existingRefs: [])
         rows[2].isSelected = false
-        guard case .array(let items) = ImportLogic.payload(rows: rows, timeZone: Fixture.tz) else { return XCTFail() }
+        guard case .array(let items) = ImportLogic.payload(rows: rows) else { return XCTFail() }
         XCTAssertEqual(items.count, 2)
         guard case .object(let a) = items[0], case .object(let b) = items[1] else { return XCTFail() }
-        XCTAssertEqual(a["due_has_time"], .bool(false))
-        XCTAssertEqual(b["due_has_time"], .bool(true))
+        // 앱이 시각을 만들어 보내지 않는다: due_at, due_has_time은 없고 서버가 준 날짜와 시각 문자열이 그대로 간다.
+        XCTAssertNil(a["due_at"])
+        XCTAssertNil(a["due_has_time"])
+        XCTAssertEqual(a["due_date"], .string("2026-11-25"))
+        XCTAssertEqual(a["due_time"], .null)
+        XCTAssertEqual(b["due_date"], .string("2026-11-25"))
+        XCTAssertEqual(b["due_time"], .string("14:30"))
         XCTAssertEqual(b["done"], .bool(true))
-        XCTAssertEqual(b["due_at"], .string("2026-11-25T05:30:00Z"))     // 14:30 KST
         XCTAssertEqual(a["source_ref"], .string("r1"))
     }
 

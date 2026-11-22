@@ -8,7 +8,7 @@ final class RecordStubBackend: Backend, @unchecked Sendable {
 
     private let lock = NSLock()
     private var replies: [String: [Reply]] = [:]
-    private(set) var calls: [Call] = []
+    private var allCalls: [Call] = []
     var currentUserID: UUID? { UUID(uuidString: "11111111-2222-3333-4444-555555555555") }
 
     func on(_ name: String, _ reply: Reply) {
@@ -17,13 +17,13 @@ final class RecordStubBackend: Backend, @unchecked Sendable {
     }
     func calls(_ name: String) -> [Call] {
         lock.lock(); defer { lock.unlock() }
-        return calls.filter { $0.name == name }
+        return allCalls.filter { $0.name == name }
     }
 
     func rpc<T: Decodable>(_ name: String, _ params: [String: JSONValue]) async throws -> T {
         let reply: Reply = try {
             lock.lock(); defer { lock.unlock() }
-            calls.append(Call(name: name, params: params))
+            allCalls.append(Call(name: name, params: params))
             guard var q = replies[name], !q.isEmpty else { throw BackendError(code: "unknown") }
             let first = q.removeFirst()
             if q.isEmpty { q = [first] }
