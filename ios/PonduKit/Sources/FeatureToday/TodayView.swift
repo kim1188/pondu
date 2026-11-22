@@ -249,8 +249,8 @@ struct TodayView: View {
         case .newBlock(let t): BlockEditView(model: model, todo: t, block: nil)
         case .editBlock(let b): BlockEditView(model: model, todo: model.snapshot?.todo(b.todoId), block: b)
         case .assistant(let kind, let text, let signal):
-            AssistantView(model: AssistantModel(kind: kind, text: text, today: model, consent: UserDefaultsConsent(), signal: signal), today: model, autoSend: kind == .capture)
-        case .importer: ImportView(model: ImportModel(today: model))
+            AssistantView(kind: kind, text: text, signal: signal, today: model)
+        case .importer: ImportView(today: model)
         case .calendars: CalendarPickerView(model: model)
         }
     }
