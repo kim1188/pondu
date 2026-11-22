@@ -89,3 +89,4 @@ iOS 네 흐름은 충돌 없이 합쳐졌고 Swift 파일은 90여 개다. 타�
 |---|---|---|---|
 | 2026-11-22 | XcodeGen 2.48.0 실행 종료 코드 137, 이후 실행 파일 소실 | 공식 아카이브 체크섬은 일치했다. `project.yml`을 기준으로 로컬 Xcode 프로젝트를 별도로 만들었다 | 원인 미확인 |
 | 2026-11-22 | iPhone 17 시뮬레이터 빌드, 빌드 후 실행 요청이 각각 300초 뒤 시간 초과 | 두 로그에 Xcode 호출과 빌드 설정이 남았다. 별도 `xcodebuild`에서 SwiftPM 캐시 접근 오류와 CoreSimulator 연결 거부를 확인했다. 캐시를 임시 경로로 바꾼 `swift package resolve`도 매니페스트 샌드박스 적용 권한 오류로 종료됐다 | 시간 초과 원인 미확인 |
+| 2026-11-23 | Xcode에서 프로젝트 열기 지연, Xcode·Finder 자동 조작 시간 초과 | `~/Documents`에 iCloud File Provider 연결 흔적이 있다. `/private/tmp`의 동일한 프로젝트는 `xcodebuild`에서 패키지 해석 단계까지 읽혔고 같은 캐시 접근 오류가 났다 | GUI 지연 원인 및 로컬 사본 GUI 열기 미확인 |
