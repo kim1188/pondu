@@ -4,6 +4,8 @@
 
 -- 알림 발송 중복 방지용: 집어 간 시각. 5분이 지나도 발송 표시가 없으면 다시 집힌다.
 alter table notification_outbox add column if not exists claimed_at timestamptz;
+-- 보내지 않고 끝낸 건(차단, 10분 안 중복). 중복 판정은 실제로 보낸 건만 기준으로 삼는다.
+alter table notification_outbox add column if not exists skipped boolean not null default false;
 
 -- ── 비서 호출 기록과 하루 한도 ──
 -- 한도는 한국 시간 하루(자정~자정), 같은 kind끼리 센다. 실패한 호출도 센다(모델 비용이 이미 났을 수 있다).
@@ -75,19 +77,17 @@ $$;
 
 -- ── 알림 발송 ──
 -- 24시간이 지난 알림은 보내지 않는다. 집어 간 건은 발송 표시가 없어도 5분 동안 다시 집히지 않는다.
--- 행위자(payload.user_id, 없으면 payload.actor_id)와 받는 사람 사이에 차단 관계가 있으면(어느 방향이든)
--- 집는 순간 보내지 않고 발송 처리한다. actor_name은 행위자의 표시 이름(없으면 null).
+-- 보내지 않고 발송 처리(skipped)하는 경우:
+--  · 행위자(payload.user_id, 없으면 actor_id)와 받는 사람 사이에 차단 관계가 있을 때(어느 방향이든)
+--  · 같은 (받는 사람, 행위자, 종류, 대상=payload.session_id)의 알림을 10분 안에 이미 보냈거나 같은 묶음에서 먼저 집었을 때
+-- actor_name은 행위자의 표시 이름(없으면 null).
 create or replace function notification_outbox_claim(p_limit int)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v jsonb;
 begin
-  with picked as (
-    select o.id,
-           exists (
-             select 1 from blocks b
-              where (b.blocker_id = o.user_id and b.blocked_id = actor.id)
-                 or (b.blocker_id = actor.id and b.blocked_id = o.user_id)
-           ) as blk
+  with cand as (
+    select o.id, o.user_id, o.kind, o.payload,
+           actor.id as actor_id, o.payload->>'session_id' as target
       from notification_outbox o
       cross join lateral (
         select case when coalesce(o.payload->>'user_id', o.payload->>'actor_id') ~ '^[0-9a-f-]{36}$'
@@ -99,11 +99,24 @@ begin
      order by o.id
      limit greatest(1, least(coalesce(p_limit, 100), 500))
      for update of o skip locked
+  ), picked as (
+    select c.id,
+           ( exists (select 1 from blocks b
+                      where (b.blocker_id = c.user_id and b.blocked_id = c.actor_id)
+                         or (b.blocker_id = c.actor_id and b.blocked_id = c.user_id))
+             or exists (select 1 from notification_outbox d
+                         where d.id <> c.id and d.sent_at > now() - interval '10 minutes' and not d.skipped
+                           and d.user_id = c.user_id and d.kind = c.kind
+                           and d.payload->>'session_id' is not distinct from c.target
+                           and coalesce(d.payload->>'user_id', d.payload->>'actor_id') is not distinct from coalesce(c.payload->>'user_id', c.payload->>'actor_id'))
+             or row_number() over (partition by c.user_id, c.kind, c.target, c.actor_id order by c.id) > 1
+           ) as skip
+      from cand c
   ), upd as (
     update notification_outbox o
-       set claimed_at = now(), sent_at = case when picked.blk then now() end
+       set claimed_at = now(), sent_at = case when picked.skip then now() end, skipped = picked.skip
       from picked where o.id = picked.id
-    returning o.id, o.user_id, o.kind, o.payload, picked.blk
+    returning o.id, o.user_id, o.kind, o.payload, picked.skip
   )
   select coalesce(jsonb_agg(jsonb_build_object(
       'id', u.id, 'user_id', u.user_id, 'kind', u.kind, 'payload', u.payload,
@@ -112,7 +125,7 @@ begin
                                       then coalesce(u.payload->>'user_id', u.payload->>'actor_id')::uuid end),
       'tokens', coalesce((select jsonb_agg(token order by created_at) from device_tokens d where d.user_id = u.user_id), '[]'::jsonb)
     ) order by u.id), '[]'::jsonb)
-    into v from upd u where not u.blk;
+    into v from upd u where not u.skip;
   return v;
 end $$;
 

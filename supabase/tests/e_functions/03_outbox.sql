@@ -4,9 +4,9 @@ declare
   s uuid := gen_random_uuid(); a uuid := gen_random_uuid(); b uuid := gen_random_uuid();
   r jsonb; ids bigint[]; n int;
 begin
-  insert into schools (id, name, email_domains) values (s, '테스트대', '{test.ac.kr}');
-  insert into auth.users (id, email) values (a, a::text || '@test.ac.kr'), (b, b::text || '@test.ac.kr');
-  insert into profiles (id, school_id, handle, display_name) values (a, s, 'a_' || substr(a::text, 1, 8), '가은'), (b, s, 'b_' || substr(b::text, 1, 8), 'B');
+  insert into schools (id, name, email_domains) values (s, '테스트대', '{korea.ac.kr}');
+  insert into auth.users (id, email) values (a, a::text || '@korea.ac.kr'), (b, b::text || '@korea.ac.kr');
+  insert into profiles (id, school_id, handle, display_name) values (a, s, 'e_a_' || substr(a::text, 1, 8), '가은'), (b, s, 'e_b_' || substr(b::text, 1, 8), 'B');
   insert into device_tokens (user_id, token) values (a, 'tok-a1'), (a, 'tok-a2');
 
   insert into notification_outbox (user_id, kind, payload) values
@@ -46,4 +46,24 @@ begin
   select count(*) into n from notification_outbox where sent_at is not null and created_at > now() - interval '1 minute'
      and kind in ('reaction','comment') and claimed_at is not null;
   assert n >= 2, format('차단 알림이 발송 처리되지 않음: %s', n);
+
+  -- 중복: 같은 (받는 사람, 행위자, 종류, 대상)은 10분에 한 번만 보낸다.
+  delete from blocks;
+  declare sid text := gen_random_uuid()::text; begin
+    insert into notification_outbox (user_id, kind, payload) values
+      (a, 'reaction', jsonb_build_object('user_id', b::text, 'session_id', sid)),
+      (a, 'reaction', jsonb_build_object('user_id', b::text, 'session_id', sid)),                       -- 같은 묶음의 중복
+      (a, 'reaction', jsonb_build_object('user_id', b::text, 'session_id', gen_random_uuid()::text));   -- 대상이 다르면 별개
+    r := notification_outbox_claim(10);
+    assert jsonb_array_length(r) = 2, format('같은 묶음 중복 처리: %s', r);
+    perform notification_outbox_mark_sent(array(select (e->>'id')::bigint from jsonb_array_elements(r) e));
+    -- 보낸 직후 같은 알림이 또 생기면 보내지 않는다.
+    insert into notification_outbox (user_id, kind, payload) values (a, 'reaction', jsonb_build_object('user_id', b::text, 'session_id', sid));
+    assert notification_outbox_claim(10) = '[]'::jsonb, '10분 안 중복이 나감';
+    -- 10분이 지나면 다시 보낸다.
+    update notification_outbox set sent_at = now() - interval '11 minutes' where sent_at is not null and not skipped
+       and payload->>'session_id' = sid;
+    insert into notification_outbox (user_id, kind, payload) values (a, 'reaction', jsonb_build_object('user_id', b::text, 'session_id', sid));
+    assert jsonb_array_length(notification_outbox_claim(10)) = 1, '10분이 지났는데 막힘';
+  end;
 end $$;

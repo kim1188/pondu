@@ -3,9 +3,9 @@ do $$
 declare
   s uuid := gen_random_uuid(); a uuid := gen_random_uuid(); pid uuid; i jsonb; t uuid := gen_random_uuid();
 begin
-  insert into schools (id, name, email_domains) values (s, '테스트대', '{test.ac.kr}');
-  insert into auth.users (id, email) values (a, a::text || '@test.ac.kr');
-  insert into profiles (id, school_id, handle, display_name) values (a, s, 'a_' || substr(a::text, 1, 8), 'A');
+  insert into schools (id, name, email_domains) values (s, '테스트대', '{korea.ac.kr}');
+  insert into auth.users (id, email) values (a, a::text || '@korea.ac.kr');
+  insert into profiles (id, school_id, handle, display_name) values (a, s, 'e_a_' || substr(a::text, 1, 8), 'A');
   insert into threads (id, user_id, title, primary_category) values (t, a, '선형대수', 'study');
 
   pid := assistant_proposal_save(a, 'capture',

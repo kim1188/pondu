@@ -47,6 +47,7 @@ test('이벤트 순서: message_delta 여러 번 → proposal 한 번, 그 뒤�
   assert.deepEqual(p.proposal, out, '제안은 core 모양 그대로(덧붙인 필드 없음)');
   assert.deepEqual(log.saved[0].proposal, out);
   assert.deepEqual(p.calibration, []);
+  assert.equal(p.expires_at, new Date(NOW + 24 * 3600 * 1000).toISOString(), '만든 지 24시간 뒤 만료');
   // 저장: 대화 원문은 input에 넣어 보내지 않는다(kind, now만)
   assert.deepEqual(log.saved[0].input, { kind: 'capture', now: nowIso });
   assert.equal(JSON.stringify(log.saved[0].input).includes('금요일'), false);

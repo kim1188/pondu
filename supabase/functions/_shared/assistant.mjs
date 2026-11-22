@@ -130,7 +130,9 @@ export async function handleAssistant({ body, userId, deps, emit }) {
     let proposalId;
     try { proposalId = await db.saveProposal(userId, req.kind, { kind: req.kind, now: req.now }, stored); } catch (e) { throw fromDbError(e); }
     ok = true;
-    emit('proposal', { proposal_id: proposalId, proposal: stored, dropped: result.dropped, calibration });
+    // 제안은 만든 지 24시간이 지나면 적용할 수 없다(D가 막는다). 앱이 안내에 쓰도록 만료 시각을 같이 준다.
+    const expires_at = new Date(deps.now() + 24 * 3600 * 1000).toISOString();
+    emit('proposal', { proposal_id: proposalId, proposal: stored, dropped: result.dropped, calibration, expires_at });
   } catch (e) {
     const code = e instanceof FnError ? e.code : 'assistant_unavailable';
     emit('error', { code });

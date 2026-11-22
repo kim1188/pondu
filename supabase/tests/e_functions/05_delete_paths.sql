@@ -3,9 +3,9 @@ do $$
 declare
   s uuid := gen_random_uuid(); a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); p text[]; n int;
 begin
-  insert into schools (id, name, email_domains) values (s, '테스트대', '{test.ac.kr}');
-  insert into auth.users (id, email) values (a, a::text || '@test.ac.kr'), (b, b::text || '@test.ac.kr');
-  insert into profiles (id, school_id, handle, display_name) values (a, s, 'a_' || substr(a::text, 1, 8), 'A'), (b, s, 'b_' || substr(b::text, 1, 8), 'B');
+  insert into schools (id, name, email_domains) values (s, '테스트대', '{korea.ac.kr}');
+  insert into auth.users (id, email) values (a, a::text || '@korea.ac.kr'), (b, b::text || '@korea.ac.kr');
+  insert into profiles (id, school_id, handle, display_name) values (a, s, 'e_a_' || substr(a::text, 1, 8), 'A'), (b, s, 'e_b_' || substr(b::text, 1, 8), 'B');
   insert into sessions (user_id, client_id, primary_category, status, photo_path, photo_thumb_path) values
     (a, gen_random_uuid(), 'study', 'ended', a::text || '/s1/full.heic', a::text || '/s1/thumb.heic'),
     (a, gen_random_uuid(), 'coding', 'ended', null, null),
@@ -28,10 +28,10 @@ declare
   s uuid := gen_random_uuid(); o uuid := gen_random_uuid(); m1 uuid := gen_random_uuid(); m2 uuid := gen_random_uuid();
   g1 uuid := gen_random_uuid(); g2 uuid := gen_random_uuid(); r jsonb;
 begin
-  insert into schools (id, name, email_domains) values (s, '테스트대', '{test.ac.kr}');
-  insert into auth.users (id, email) values (o, o::text || '@test.ac.kr'), (m1, m1::text || '@test.ac.kr'), (m2, m2::text || '@test.ac.kr');
+  insert into schools (id, name, email_domains) values (s, '테스트대', '{korea.ac.kr}');
+  insert into auth.users (id, email) values (o, o::text || '@korea.ac.kr'), (m1, m1::text || '@korea.ac.kr'), (m2, m2::text || '@korea.ac.kr');
   insert into profiles (id, school_id, handle, display_name) values
-    (o, s, 'o_' || substr(o::text, 1, 8), 'O'), (m1, s, 'm_' || substr(m1::text, 1, 8), 'M1'), (m2, s, 'n_' || substr(m2::text, 1, 8), 'M2');
+    (o, s, 'e_o_' || substr(o::text, 1, 8), 'O'), (m1, s, 'e_m_' || substr(m1::text, 1, 8), 'M1'), (m2, s, 'e_n_' || substr(m2::text, 1, 8), 'M2');
   insert into groups (id, school_id, name, owner_id, invite_code) values (g1, s, '스터디', o, 'code-' || g1::text), (g2, s, '혼자', o, 'code-' || g2::text);
   insert into group_members (group_id, user_id, role, joined_at) values
     (g1, o, 'owner', now() - interval '3 days'), (g1, m2, 'member', now() - interval '1 day'), (g1, m1, 'member', now() - interval '2 days'),

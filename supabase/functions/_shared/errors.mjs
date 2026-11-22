@@ -20,7 +20,11 @@ export const jsonResponse = (body, status = 200, headers = {}) =>
 
 export const errorResponse = e => {
   const code = e instanceof FnError ? e.code : 'unknown';
-  return jsonResponse({ error: { code } }, e instanceof FnError ? e.status : 500);
+  return jsonResponse({ code }, e instanceof FnError ? e.status : 500);
 };
+
+/** assistant 전용: 인증 실패 같은 시작 전 오류도 HTTP 200 이벤트 스트림의 error 이벤트로 준다. */
+export const sseErrorResponse = code =>
+  new Response(sse('error', { code }), { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } });
 
 export const sse = (event, data) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
