@@ -18,13 +18,16 @@ export function resolveRef(ref, input, proposal) {
  */
 export function validate(input, proposal) {
   const v = [];
-  const add = (rule, detail) => v.push({ rule, detail });
+  // loc: 위반이 가리키는 위치({todo|block|unscheduled|done_id}). 서버가 걸린 블록만 빼는 데 쓴다.
+  let loc = null;
+  const add = (rule, detail) => v.push(loc ? { rule, detail, ...loc } : { rule, detail });
   const now = ms(input.now);
   const today = localDate(now);
   const prefs = { day_start: '08:00', day_end: '23:00', ...(input.prefs ?? {}) };
   const openIds = new Set((input.todos ?? []).filter(t => t.status !== 'done').map(t => t.id));
 
   for (const [i, t] of proposal.todos.entries()) {
+    loc = { todo: i };
     if (!String(t.title ?? '').trim()) add('todo_title', `todos[${i}] 제목이 비어 있음`);
     if (t.due_date != null && !DATE_RE.test(t.due_date)) add('due_format', `todos[${i}].due_date=${t.due_date}`);
     if (t.due_time != null && !HM_RE.test(t.due_time)) add('due_format', `todos[${i}].due_time=${t.due_time}`);
@@ -33,12 +36,15 @@ export function validate(input, proposal) {
   }
 
   for (const id of proposal.done_todo_ids) {
+    loc = { done_id: id };
     if (!openIds.has(id)) add('done_unknown', `완료 처리 대상 ${id} 가 열린 할 일이 아님`);
   }
-  for (const u of proposal.unscheduled) {
+  for (const [i, u] of proposal.unscheduled.entries()) {
+    loc = { unscheduled: i };
     if (!resolveRef(u.todo_ref, input, proposal)) add('ref_unknown', `unscheduled 의 ${u.todo_ref}`);
   }
 
+  loc = null;
   if (input.kind === 'capture' && proposal.blocks.length) {
     add('capture_no_blocks', 'capture 요청인데 예정 시간을 만들었음');
   }
@@ -49,6 +55,7 @@ export function validate(input, proposal) {
 
   for (const [i, b] of proposal.blocks.entries()) {
     const s = ms(b.start), e = ms(b.end);
+    loc = { block: i };
     const tag = `blocks[${i}] ${b.todo_ref}`;
     if (s == null || e == null) { add('block_time', `${tag} 시각을 읽을 수 없음`); continue; }
     const minutes = (e - s) / 60000;
