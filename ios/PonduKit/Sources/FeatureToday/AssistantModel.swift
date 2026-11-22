@@ -196,7 +196,7 @@ final class AssistantModel {
     @ObservationIgnored private let sessionSignal: SessionEndSignal?
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var readerTask: Task<AssistantStreamState, Never>?
-    @ObservationIgnored static let timeout: UInt64 = 20_000_000_000      // 비서 20초
+    static let timeout: UInt64 = 20_000_000_000      // 비서 20초
 
     init(kind: AssistantKind, text: String = "", today: TodayModel, consent: ConsentStoring, signal: SessionEndSignal? = nil) {
         self.kind = kind; self.inputText = text; self.today = today; self.consent = consent; self.sessionSignal = signal
