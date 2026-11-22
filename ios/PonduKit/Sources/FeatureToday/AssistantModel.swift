@@ -212,6 +212,9 @@ final class AssistantModel {
     }
     private var isFailed: Bool { if case .failed = phase { return true } else { return false } }
 
+    /// 시험용: 진행 중인 요청이 끝날 때까지 기다린다.
+    func waitUntilDone() async { await task?.value }
+
     func cancel() { task?.cancel(); readerTask?.cancel(); task = nil }
 
     func send() {
