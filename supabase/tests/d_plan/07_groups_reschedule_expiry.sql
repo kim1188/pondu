@@ -62,7 +62,6 @@ begin
       jsonb_build_object('todo_ref', t1 ->> 'id', 'start', d || 'T10:00:00+09:00', 'end', d || 'T11:00:00+09:00'),
       jsonb_build_object('todo_ref', t1 ->> 'id', 'start', d || 'T13:00:00+09:00', 'end', d || 'T14:00:00+09:00')))) returning id into p;
   perform test_login(a);
-  perform d_expect(format($q$select apply_proposal(%L, null, null, false)$q$, p), 'invalid_input');       -- null
   perform d_expect(format($q$select apply_proposal(%L, null, array[0], false)$q$, p), 'invalid_input');   -- 일부
   perform d_expect(format($q$select apply_proposal(%L, null, array[]::int[], false)$q$, p), 'invalid_input');
   perform d_expect(format($q$select apply_proposal(%L, null, array[0, 0], false)$q$, p), 'invalid_input');

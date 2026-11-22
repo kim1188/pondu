@@ -99,7 +99,7 @@
 |---|---|---|
 | 친구 요청 재요청 제한 | 상대가 내 요청을 거절(`respond_friend_request(p_accept = false)`)하면 같은 상대에게 7일 동안 다시 `send_friend_request`를 못 한다. 7일이 지나면 가능. 거절한 사람이 먼저 보내는 요청은 막지 않고, 서로 친구가 되면 기록은 지워진다. 기록은 새 표 `friend_request_rejections`(앱이 직접 접근 불가). | `rate_limited` |
 | 차단과 친구 요청 | 내가 상대를 차단했으면 `blocked`. 상대가 나를 차단했으면 요청도 알림도 만들지 않고 **성공(null)**을 돌려준다. 차단당한 사실이 드러나지 않게 하려는 것이다. 앱은 성공으로 보이는 "요청 보냄" 상태를 보여 주되 `list_friend_requests`에는 나타나지 않는다. | `blocked`(내가 차단한 경우만) |
-| 재배치 전부 적용 | 제안의 `kind`가 `reschedule`이면 `p_block_indexes`는 블록 전체(`0..n-1`, 순서·중복 무관)여야 한다. null이거나 일부면 거절하고 제안은 소비되지 않는다. 블록이 0개인 제안은 빈 배열을 준다. `p_todo_indexes`와 다른 `kind`는 전과 같다(null이면 전부). | `invalid_input` |
+| 재배치 전부 적용 | 제안의 `kind`가 `reschedule`이면 `p_block_indexes`는 null(전부) 또는 블록 전체(`0..n-1`, 순서·중복 무관)여야 한다. 일부만 고르면 거절하고 제안은 소비되지 않는다. `p_todo_indexes`와 다른 `kind`는 전과 같다(null이면 전부). | `invalid_input` |
 | 제안 유효 기간 | 만든 지 24시간이 지난 제안은 적용할 수 없다. 이미 적용한 제안의 재적용은 기간과 상관없이 `proposal_already_applied`. | `proposal_not_found` |
 | 가져오기 기한 | `import_todos` 항목은 `due_at`(+`due_has_time`) 대신 `due_date`(`YYYY-MM-DD`)와 `due_time`(`HH:MM` 또는 null)을 줄 수 있다. 한국 시간 기준이고 `apply_proposal`과 같은 변환을 쓴다. 시각이 없으면 그날 23:59 KST와 `due_has_time = false`. `due_at` 방식도 계속 받는다. 한 항목에 둘을 같이 주거나(`due_date`와 `due_at`), `due_time`만 주거나, 형식이 틀리면 거절. | `invalid_input` |
 | 크루 가시성 | `can_view_session`: `crew` 공개 세션은 (작성자와 친구) 또는 (보는 사람과 작성자가 둘 다 그 세션의 `group_id` 크루의 활동 중인 구성원). `group_id`가 null인 `crew` 세션(크루가 사라진 경우)은 친구만. 차단·신고·`needs_confirmation` 규칙은 그대로. 크루에서 나가거나 내보내지면 그 크루로 묶인 세션은 그 크루원에게 곧바로 안 보인다. | |

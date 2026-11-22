@@ -517,7 +517,8 @@ begin
   end if;
 
   -- 재배치는 전부 적용하거나 적용하지 않는다. 일부만 고르면 고르지 않은 기존 계획이 사라진다.
-  if v_prop.kind = 'reschedule' and (p_block_indexes is null or coalesce(array_length(v_bi, 1), 0) <> v_nb) then
+  -- p_block_indexes 가 null 이면 전부를 뜻한다(계약 3절 D).
+  if v_prop.kind = 'reschedule' and coalesce(array_length(v_bi, 1), 0) <> v_nb then
     perform plan_fail('invalid_input');
   end if;
 
