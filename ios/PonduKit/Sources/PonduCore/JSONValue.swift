@@ -105,7 +105,8 @@ public enum PonduJSON {
             let last = keys.last!
             // 분야 이름을 키로 쓰는 사전(estimate_factors, by_category)은 그대로 둔다.
             if last.intValue == nil, categoryRawValues.contains(last.stringValue) { return last }
-            return AnyKey(stringValue: camelCase(last.stringValue)) ?? last
+            if let converted = AnyKey(stringValue: camelCase(last.stringValue)) { return converted }
+            return last
         }
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()

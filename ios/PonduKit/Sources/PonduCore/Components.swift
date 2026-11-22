@@ -121,19 +121,19 @@ private struct OpenSettingsKey: EnvironmentKey {
 
 extension EnvironmentValues {
     /// 앱 껍데기가 넣어 주는 `설정 열기` 동작. 탭 화면이 자기 툴바에 `SettingsButton`을 놓을 때 쓴다.
-    public var openSettings: () -> Void {
+    public var showSettings: () -> Void {
         get { self[OpenSettingsKey.self] }
         set { self[OpenSettingsKey.self] = newValue }
     }
 }
 
 public struct SettingsButton: View {
-    @Environment(\.openSettings) private var openSettings
+    @Environment(\.showSettings) private var showSettings
 
     public init() {}
 
     public var body: some View {
-        Button(action: openSettings) {
+        Button(action: showSettings) {
             Image(systemName: "gearshape")
         }
         .accessibilityLabel("설정")

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ko</string>
+	<key>CFBundleDisplayName</key>
+	<string>Pondu</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>세션 사진을 앱 안에서 바로 찍기 위해 카메라를 사용해요. 사진 보관함은 사용하지 않아요.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>일정이 있는 시간을 피해서 계획을 짜려고 캘린더를 읽어요. 일정의 제목과 메모는 기기 밖으로 나가지 않고, 바쁜 시간 구간만 계획에 쓰여요. 원본 일정은 수정하지 않아요.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>일정이 있는 시간을 피해서 계획을 짜려고 캘린더를 읽어요. 일정의 제목과 메모는 기기 밖으로 나가지 않고, 바쁜 시간 구간만 계획에 쓰여요. 원본 일정은 수정하지 않아요.</string>
+	<key>PonduNotificationUsageText</key>
+	<string>정해 둔 시간에 시작할 수 있도록 알림을 보내 드려요.</string>
+	<key>PonduSupabaseURL</key>
+	<string>$(SUPABASE_URL)</string>
+	<key>PonduSupabaseAnonKey</key>
+	<string>$(SUPABASE_ANON_KEY)</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+</dict>
+</plist>
