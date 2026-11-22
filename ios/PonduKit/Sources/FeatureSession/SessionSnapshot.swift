@@ -109,9 +109,9 @@ enum ErrorText {
         case "session_already_active": return "이미 진행 중인 세션이 있어요."
         case "session_not_active": return "이미 끝났거나 진행 중이 아닌 세션이에요."
         case "visibility_not_available": return "이 공개 대상은 아직 쓸 수 없어요."
-        case "join_not_allowed": return "같이 하기를 시작할 수 없어요. 상대가 아직 하는 중인지 확인해 주세요."
+        case "join_not_allowed": return "지금은 같이 할 수 없어요."
         case "not_authenticated": return "다시 로그인해 주세요."
-        case "invalid_input": return "입력한 값을 서버가 받지 못했어요. 다시 확인해 주세요."
+        case "invalid_input": return "서버가 이 기록을 받지 못했어요. 시작 시각이 이전 세션과 겹칠 수 있어요."
         case "network", "timeout": return "연결이 불안정해요. 잠시 뒤 다시 시도해 주세요."
         default: return "문제가 생겼어요. 다시 시도해 주세요."
         }

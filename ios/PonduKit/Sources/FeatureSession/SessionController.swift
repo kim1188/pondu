@@ -29,6 +29,7 @@ public final class SessionController: SessionControlling {
         var startedAt: Date?
         var isOfflineStart: Bool
         var captureMode: String
+        var todoID: UUID?
 
         var awaitingServer: Bool { serverID == nil }
     }
@@ -157,7 +158,7 @@ public final class SessionController: SessionControlling {
     private func provisionalState(for p: PendingStart, offline: Bool) -> LiveState {
         LiveState(clientID: p.clientID, serverID: nil, category: p.category, shareTitle: p.shareTitle,
                   joinedWithName: p.joinedWithName, phase: .live, clock: .provisional(uptime: uptime()),
-                  startedAt: nil, isOfflineStart: offline, captureMode: p.captureMode)
+                  startedAt: nil, isOfflineStart: offline, captureMode: p.captureMode, todoID: p.todoID)
     }
 
     private func performStart(_ p: PendingStart) async {
@@ -227,6 +228,8 @@ public final class SessionController: SessionControlling {
 
     // MARK: - 종료
 
+    private var currentTodoID: UUID? { live?.todoID }
+
     func presentEnd() {
         guard let l = live, l.phase == .live || l.phase == .paused else { return }
         endDraft = EndDraft()
@@ -239,6 +242,7 @@ public final class SessionController: SessionControlling {
     func commitEnd() {
         guard let before = live, let choice = endDraft.choice, !isBusy else { return }
         let note = endDraft.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let todoID = currentTodoID
         live = nil
         route = .none
         isBusy = true
@@ -252,9 +256,20 @@ public final class SessionController: SessionControlling {
                     "p_outcome": .string(choice.serverValue),
                     "p_progress_note": note.isEmpty ? .null : .string(note),
                 ])
+                if pair.snapshot.phase == .needsConfirmation {
+                    // 한도를 넘긴 채 종료: 종료 확인 화면으로 보낸다.
+                    self.toast = nil
+                    self.adopt(pair, clientID: before.clientID)
+                    return
+                }
                 self.liveSession = nil
                 self.lastEndedSession = pair.dto
                 self.removePhotoFilesIfNoPending(clientID: before.clientID)
+                NotificationCenter.default.post(
+                    name: Notification.Name("pondu.session.ended"), object: nil,
+                    userInfo: ["todo_id": todoID?.uuidString.lowercased() as Any,
+                               "outcome": choice.serverValue,
+                               "note": (note.isEmpty ? nil : note) as Any])
             } catch {
                 if self.live == nil { self.live = before }
                 self.toast = nil
@@ -356,7 +371,8 @@ public final class SessionController: SessionControlling {
             clock: SessionClock(snapshot: s, uptime: uptime()),
             startedAt: s.startedAt,
             isOfflineStart: s.offlineStartedAt != nil,
-            captureMode: s.captureMode)
+            captureMode: s.captureMode,
+            todoID: prev?.todoID)
         live = state
         liveSession = pair.dto
         if phase == .needsConfirmation {
