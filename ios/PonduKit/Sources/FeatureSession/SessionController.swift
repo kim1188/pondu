@@ -401,7 +401,13 @@ public final class SessionController: SessionControlling {
         }
     }
 
+    @ObservationIgnored private var flushingStarts = false
+    @ObservationIgnored private var flushingPhotos = false
+
     private func flushStarts() async {
+        guard !flushingStarts else { return }
+        flushingStarts = true
+        defer { flushingStarts = false }
         for p in pending.starts {
             let age = now().timeIntervalSince(p.tappedAt)
             if age > SessionRules.offlineMaxAge {
@@ -445,7 +451,9 @@ public final class SessionController: SessionControlling {
     }
 
     private func flushPhotos() async {
-        guard let userID = backend.currentUserID else { return }
+        guard !flushingPhotos, let userID = backend.currentUserID else { return }
+        flushingPhotos = true
+        defer { flushingPhotos = false }
         for item in pending.photos {
             let dir = photoDirectory(for: item.clientID)
             let full = dir.appendingPathComponent("full.heic")
@@ -536,6 +544,16 @@ public final class SessionController: SessionControlling {
         await mutationTask?.value
         await photoUploadTask?.value
         await flushTask?.value
+    }
+
+    func waitForStart() async { await startTask?.value }
+    func waitForPhotoUpload() async { await photoUploadTask?.value }
+    /// 테스트용: 다시 보내기 반복을 멈추고 끝날 때까지 기다린다.
+    func cancelFlush() async {
+        let t = flushTask
+        t?.cancel()
+        await t?.value
+        flushTask = nil
     }
 
     var pendingState: PendingState { pending }
