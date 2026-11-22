@@ -105,7 +105,7 @@ begin
     assert m = 'proposal_not_found', '남의 제안 거절 코드: ' || m;
   end;
   perform test_login(u1);
-  res := apply_proposal(pid, null, null, false);
+  res := apply_proposal(pid, null, array[0], false);
   assert jsonb_array_length(res -> 'blocks') = 1 and res -> 'blocks' -> 0 ->> 'origin' = 'assistant';
   begin
     perform apply_proposal(pid, null, null, false);
