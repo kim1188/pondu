@@ -29,10 +29,12 @@
 | C social | `ws/c-social` | main에 병합 | `[로컬]` 테스트 8개. 피드 조회 7~17ms(사용자 3천, 세션 15만) |
 | D plan | `ws/d-plan` | main에 병합 | `[로컬]` 테스트 7개 |
 | E functions | `ws/e-functions` | main에 병합 | `[모의]` 가짜 Claude·가짜 APNs로 66개. assistant 진입점만 로컬에서 띄워 `[로컬]`. 실제 API 호출 0회 |
-| F ios-foundation | `ws/f-ios-foundation` | 진행 중 | |
-| G ios-session | `ws/g-ios-session` | 브랜치에 있음 | `[코드]` 빌드·시험 실행 못 함 |
-| H ios-together | `ws/h-ios-together` | 브랜치에 있음 | `[코드]` 빌드·시험 실행 못 함 |
-| I ios-today | `ws/i-ios-today` | 브랜치에 있음 | `[코드]` 빌드·시험 실행 못 함 |
+| F ios-foundation | `ws/f-ios-foundation` | main에 병합(초안) | `[코드]` 빌드·시험 실행 못 함 |
+| G ios-session | `ws/g-ios-session` | main에 병합(초안) | `[코드]` 빌드·시험 실행 못 함 |
+| H ios-together | `ws/h-ios-together` | main에 병합(초안) | `[코드]` 빌드·시험 실행 못 함 |
+| I ios-today | `ws/i-ios-today` | main에 병합(초안) | `[코드]` 빌드·시험 실행 못 함 |
+
+iOS 네 흐름은 충돌 없이 합쳐졌고 Swift 파일은 90여 개다. 타입 이름(`ActivityCategory`, `ShareVisibility`)은 글자 검색으로 맞췄지만 컴파일해 본 적이 없다. H와 I는 공용 모델 대신 자기 폴더의 모델을 쓰고, F가 확인하지 못한 라이브러리 호출 목록은 `ws/f-ios-foundation`의 보고에 있다(오류 응답의 세부 모양, 저장소 서명 주소 형식 등).
 
 ## 통합 관문
 

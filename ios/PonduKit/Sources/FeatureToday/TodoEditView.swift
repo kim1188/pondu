@@ -14,7 +14,7 @@ struct TodoEditView: View {
     @State private var estimate = 30
     @State private var creatingThread = false
     @State private var newThreadTitle = ""
-    @State private var newThreadCategory: Category?
+    @State private var newThreadCategory: ActivityCategory?
     @State private var saving = false
 
     var body: some View {

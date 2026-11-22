@@ -31,7 +31,7 @@ enum TodayLogic {
     /// "과제는 평소 1.4배 걸려서 85분으로 잡았어요" — 배수가 1에 가까우면(±5%) 말하지 않는다.
     static func estimateNote(categoryRaw: String?, estimateMin: Int?, factors: [String: Double]) -> String? {
         guard let raw = categoryRaw, let minutes = estimateMin, let f = factors[raw], abs(f - 1.0) >= 0.05 else { return nil }
-        let name = Category(rawValue: raw)?.displayName ?? raw
+        let name = ActivityCategory(rawValue: raw)?.displayName ?? raw
         let factorText = String(format: "%.1f", f)
         return "\(name)는 평소 \(factorText)배 걸려서 \(minutes)분으로 잡았어요"
     }

@@ -147,7 +147,7 @@ final class TodayModel {
 
     private func presentStart(todo: TodayTodo?, threadID: UUID?, blockID: UUID?, fallbackTitle: String?) {
         let thread = snapshot?.thread(threadID)
-        let category = thread?.primaryCategory.flatMap { Category(rawValue: $0) }
+        let category = thread?.primaryCategory.flatMap { ActivityCategory(rawValue: $0) }
         sessions.presentStart(StartSessionRequest(category: category, threadID: threadID, todoID: todo?.id,
                                                   planBlockID: blockID, title: todo?.title ?? thread?.title ?? fallbackTitle,
                                                   joinedSessionID: nil, joinedWithName: nil))
@@ -238,7 +238,7 @@ final class TodayModel {
 
     // MARK: 이어가는 일
 
-    func createThread(title: String, category: Category?, shareTitle: String?) async -> TodayThread? {
+    func createThread(title: String, category: ActivityCategory?, shareTitle: String?) async -> TodayThread? {
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return nil }
         do {

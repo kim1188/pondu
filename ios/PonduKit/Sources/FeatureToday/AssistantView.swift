@@ -166,7 +166,7 @@ struct AssistantView: View {
         var parts: [String] = []
         if let d = t.dueDate { parts.append(t.dueTime.map { "\(d) \($0) 마감" } ?? "\(d) 마감") }
         if let m = t.estimateMin { parts.append("\(m)분") }
-        if let c = t.category.flatMap({ Category(rawValue: $0) }) { parts.append(c.displayName) }
+        if let c = t.category.flatMap({ ActivityCategory(rawValue: $0) }) { parts.append(c.displayName) }
         return parts.isEmpty ? "기한 없음" : parts.joined(separator: " · ")
     }
 
