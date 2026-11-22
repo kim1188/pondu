@@ -4,6 +4,8 @@
 
 -- 알림 발송 중복 방지용: 집어 간 시각. 5분이 지나도 발송 표시가 없으면 다시 집힌다.
 alter table notification_outbox add column if not exists claimed_at timestamptz;
+-- 보내지 않고 끝낸 건(차단, 10분 안 중복). 중복 판정은 실제로 보낸 건만 기준으로 삼는다.
+alter table notification_outbox add column if not exists skipped boolean not null default false;
 
 -- ── 비서 호출 기록과 하루 한도 ──
 -- 한도는 한국 시간 하루(자정~자정), 같은 kind끼리 센다. 실패한 호출도 센다(모델 비용이 이미 났을 수 있다).
@@ -75,31 +77,55 @@ $$;
 
 -- ── 알림 발송 ──
 -- 24시간이 지난 알림은 보내지 않는다. 집어 간 건은 발송 표시가 없어도 5분 동안 다시 집히지 않는다.
--- actor_name: payload.actor_id가 있으면 그 사용자의 표시 이름(없으면 null).
+-- 보내지 않고 발송 처리(skipped)하는 경우:
+--  · 행위자(payload.user_id, 없으면 actor_id)와 받는 사람 사이에 차단 관계가 있을 때(어느 방향이든)
+--  · 같은 (받는 사람, 행위자, 종류, 대상=payload.session_id)의 알림을 10분 안에 이미 보냈거나 같은 묶음에서 먼저 집었을 때
+-- actor_name은 행위자의 표시 이름(없으면 null).
 create or replace function notification_outbox_claim(p_limit int)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v jsonb;
 begin
-  with picked as (
-    select id from notification_outbox
-     where sent_at is null
-       and created_at > now() - interval '24 hours'
-       and (claimed_at is null or claimed_at < now() - interval '5 minutes')
-     order by id
+  with cand as (
+    select o.id, o.user_id, o.kind, o.payload,
+           actor.id as actor_id, o.payload->>'session_id' as target
+      from notification_outbox o
+      cross join lateral (
+        select case when coalesce(o.payload->>'user_id', o.payload->>'actor_id') ~ '^[0-9a-f-]{36}$'
+                    then coalesce(o.payload->>'user_id', o.payload->>'actor_id')::uuid end as id
+      ) actor
+     where o.sent_at is null
+       and o.created_at > now() - interval '24 hours'
+       and (o.claimed_at is null or o.claimed_at < now() - interval '5 minutes')
+     order by o.id
      limit greatest(1, least(coalesce(p_limit, 100), 500))
-     for update skip locked
+     for update of o skip locked
+  ), picked as (
+    select c.id,
+           ( exists (select 1 from blocks b
+                      where (b.blocker_id = c.user_id and b.blocked_id = c.actor_id)
+                         or (b.blocker_id = c.actor_id and b.blocked_id = c.user_id))
+             or exists (select 1 from notification_outbox d
+                         where d.id <> c.id and d.sent_at > now() - interval '10 minutes' and not d.skipped
+                           and d.user_id = c.user_id and d.kind = c.kind
+                           and d.payload->>'session_id' is not distinct from c.target
+                           and coalesce(d.payload->>'user_id', d.payload->>'actor_id') is not distinct from coalesce(c.payload->>'user_id', c.payload->>'actor_id'))
+             or row_number() over (partition by c.user_id, c.kind, c.target, c.actor_id order by c.id) > 1
+           ) as skip
+      from cand c
   ), upd as (
-    update notification_outbox o set claimed_at = now()
+    update notification_outbox o
+       set claimed_at = now(), sent_at = case when picked.skip then now() end, skipped = picked.skip
       from picked where o.id = picked.id
-    returning o.id, o.user_id, o.kind, o.payload
+    returning o.id, o.user_id, o.kind, o.payload, picked.skip
   )
   select coalesce(jsonb_agg(jsonb_build_object(
       'id', u.id, 'user_id', u.user_id, 'kind', u.kind, 'payload', u.payload,
       'actor_name', (select display_name from profiles
-                      where id = case when u.payload->>'actor_id' ~ '^[0-9a-f-]{36}$' then (u.payload->>'actor_id')::uuid end),
+                      where id = case when coalesce(u.payload->>'user_id', u.payload->>'actor_id') ~ '^[0-9a-f-]{36}$'
+                                      then coalesce(u.payload->>'user_id', u.payload->>'actor_id')::uuid end),
       'tokens', coalesce((select jsonb_agg(token order by created_at) from device_tokens d where d.user_id = u.user_id), '[]'::jsonb)
     ) order by u.id), '[]'::jsonb)
-    into v from upd u;
+    into v from upd u where not u.skip;
   return v;
 end $$;
 
@@ -122,6 +148,29 @@ begin
   return n;
 end $$;
 
+-- ── 계정 삭제: 크루 정리 ──
+-- 사용자가 운영자(owner_id)인 크루는, 다른 활동 중 구성원이 있으면 가장 오래된 구성원에게 넘기고 없으면 지운다
+-- (groups.owner_id는 사용자 삭제 때 크루를 같이 지우므로 먼저 해야 한다). 돌려주는 값은 넘긴 크루 수와 지운 크루 수.
+create or replace function delete_account_cleanup_crews(p_user uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare g record; v_next uuid; v_moved int := 0; v_deleted int := 0;
+begin
+  for g in select id from groups where owner_id = p_user for update loop
+    select user_id into v_next from group_members
+     where group_id = g.id and status = 'active' and user_id <> p_user
+     order by joined_at, user_id limit 1;
+    if v_next is null then
+      delete from groups where id = g.id;
+      v_deleted := v_deleted + 1;
+    else
+      update groups set owner_id = v_next where id = g.id;
+      update group_members set role = 'owner' where group_id = g.id and user_id = v_next;
+      v_moved := v_moved + 1;
+    end if;
+  end loop;
+  return jsonb_build_object('transferred', v_moved, 'deleted', v_deleted);
+end $$;
+
 -- ── 권한: service_role 전용 ──
 do $$
 declare f text;
@@ -132,6 +181,7 @@ begin
     'assistant_thread_categories(uuid)',
     'assistant_proposal_save(uuid,text,jsonb,jsonb)',
     'delete_account_photo_paths(uuid)',
+    'delete_account_cleanup_crews(uuid)',
     'notification_outbox_claim(int)',
     'notification_outbox_mark_sent(bigint[])',
     'device_tokens_remove(text[])'

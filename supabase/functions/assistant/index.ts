@@ -1,7 +1,7 @@
 // POST /functions/v1/assistant — 이벤트 스트림(SSE). 본체는 _shared/assistant.mjs.
 import Anthropic from 'npm:@anthropic-ai/sdk@^1.12.0';
 import { handleAssistant } from '../_shared/assistant.mjs';
-import { errorResponse, sse } from '../_shared/errors.mjs';
+import { FnError, sse, sseErrorResponse } from '../_shared/errors.mjs';
 import { makeDb } from '../_shared/supabase-db.mjs';
 import { adminClient, env, num, requireUser } from '../_shared/serve.ts';
 
@@ -32,6 +32,6 @@ Deno.serve(async (req: Request) => {
     });
     return new Response(stream, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } });
   } catch (e) {
-    return errorResponse(e);
+    return sseErrorResponse(e instanceof FnError ? e.code : 'assistant_unavailable');
   }
 });

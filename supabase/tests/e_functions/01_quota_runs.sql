@@ -3,9 +3,9 @@ do $$
 declare
   s uuid := gen_random_uuid(); a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); r uuid; n int;
 begin
-  insert into schools (id, name, email_domains) values (s, '테스트대', '{test.ac.kr}');
-  insert into auth.users (id, email) values (a, a::text || '@test.ac.kr'), (b, b::text || '@test.ac.kr');
-  insert into profiles (id, school_id, handle, display_name) values (a, s, 'a_' || substr(a::text, 1, 8), 'A'), (b, s, 'b_' || substr(b::text, 1, 8), 'B');
+  insert into schools (id, name, email_domains) values (s, '테스트대', '{korea.ac.kr}');
+  insert into auth.users (id, email) values (a, a::text || '@korea.ac.kr'), (b, b::text || '@korea.ac.kr');
+  insert into profiles (id, school_id, handle, display_name) values (a, s, 'e_a_' || substr(a::text, 1, 8), 'A'), (b, s, 'e_b_' || substr(b::text, 1, 8), 'B');
 
   -- 어제(한국 시간) 기록은 세지 않는다.
   insert into assistant_runs (user_id, kind, ok, created_at)

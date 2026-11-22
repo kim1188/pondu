@@ -4,20 +4,21 @@ import { AssistantError, runProposal } from './core/run.mjs';
 import { DEFAULT_MODEL } from './core/propose.mjs';
 import { withPlanningMinutes } from './core/estimate.mjs';
 import { ms } from './core/time.mjs';
-import { blockToCore, coreTodoToServer, todoToCore } from './convert.mjs';
+import { blockToCore, todoToCore } from './convert.mjs';
 import { FnError, fromDbError } from './errors.mjs';
 
 export const KINDS = ['capture', 'plan_day', 'reschedule'];
 const MAX_TEXT = 4000;
 const MAX_PASTED = 20000;
 const MAX_BUSY = 200;
-const CLOCK_SKEW_MS = 10 * 60 * 1000;
+const TZ = 'Asia/Seoul';
 
 /** 요청 본문을 검사해 core 입력의 클라이언트 몫(kind, text, pasted, busy, session)으로 바꾼다. */
 export function parseRequest(body, serverNow) {
   if (!body || typeof body !== 'object') throw new FnError('invalid_input');
   const { kind, text = '', pasted = null, busy = [], session = null } = body;
   if (!KINDS.includes(kind)) throw new FnError('invalid_input', 400, 'kind');
+  if (body.tz != null && body.tz !== TZ) throw new FnError('invalid_input', 400, 'tz'); // core는 한국 시간만 다룬다
   if (typeof text !== 'string' || text.length > MAX_TEXT) throw new FnError('invalid_input', 400, 'text');
   if (pasted != null && (typeof pasted !== 'string' || pasted.length > MAX_PASTED)) throw new FnError('invalid_input', 400, 'pasted');
   if (kind === 'capture' && !text.trim() && !(pasted && pasted.trim())) throw new FnError('invalid_input', 400, 'empty');
@@ -36,34 +37,47 @@ export function parseRequest(body, serverNow) {
       note: typeof session.note === 'string' ? session.note.slice(0, 200) : null,
     };
   }
-  // 시각은 서버가 정한다. 클라이언트의 now는 서버 시각과 10분 안으로 맞을 때만 쓴다.
-  const cn = ms(body.now);
-  const now = cn != null && Math.abs(cn - serverNow) <= CLOCK_SKEW_MS ? new Date(cn).toISOString() : new Date(serverNow).toISOString();
+  // 기준 시각은 서버가 정한다. 요청의 now는 읽지 않는다(과거 시각으로 규칙 검사를 피하는 것을 막는다).
+  const now = new Date(serverNow).toISOString();
   return { kind, text, pasted: pasted || null, busy: cleanBusy, session: cleanSession, now };
 }
 
 /**
  * assistant_context 결과 + 요청 → core 입력. 목록·배수는 서버 값만 쓴다(클라이언트가 보낸 목록은 믿지 않는다).
+ * 할 일은 core 형식({due_date, due_time, estimate_min_calibrated, category})이면 그대로 쓰고,
+ * 서버 Todo 형식({due_at, due_has_time})이면 변환한다. 보정된 예상 시간이 있으면 estimate_min 자리에 넣고
+ * 원래 값과 배수는 calibration으로 돌려준다(앱이 안내에 쓴다).
+ * @returns {{input: object, calibration: {todo_id: string, original_min: number, calibrated_min: number, factor: number}[]}}
  */
 export function buildCoreInput(req, ctx, threadCategories = {}) {
   const factors = ctx?.estimate_factors ?? {};
-  const todos = withPlanningMinutes((ctx?.todos ?? []).map(t => todoToCore(t, { category: t.category ?? threadCategories[t.thread_id] ?? null })), factors);
+  const calibration = [];
+  const todos = (ctx?.todos ?? []).map(t => {
+    const category = t.category ?? threadCategories[t.thread_id] ?? null;
+    const core = 'due_date' in t
+      ? { id: t.id, title: t.title, due_date: t.due_date ?? null, due_time: t.due_time ?? null, estimate_min: t.estimate_min ?? null, status: t.status, category }
+      : todoToCore(t, { category });
+    const cal = t.estimate_min_calibrated;
+    if (cal != null && core.estimate_min != null) {
+      if (cal !== core.estimate_min) {
+        calibration.push({ todo_id: core.id, original_min: core.estimate_min, calibrated_min: cal, factor: Math.round((cal / core.estimate_min) * 100) / 100 });
+        core.estimate_min = cal;
+      }
+      return core; // 서버가 보정한 값이므로 여기서 또 곱하지 않는다
+    }
+    // 서버가 보정 값을 주지 않았으면 분야별 배수로 planning_min을 붙인다(대비책).
+    return withPlanningMinutes([core], factors)[0];
+  });
   const blocks = (ctx?.blocks ?? [])
-    .filter(b => b.status === 'planned' || b.status === 'started')
-    .map(blockToCore);
+    .filter(b => !b.status || b.status === 'planned' || b.status === 'started')
+    .map(b => 'start' in b ? { id: b.id, todo_ref: b.todo_ref ?? b.todo_id ?? null, start: b.start, end: b.end, locked: !!b.locked } : blockToCore(b));
   return {
-    kind: req.kind, now: req.now, text: req.text, pasted: req.pasted,
-    todos, busy: req.busy, blocks, session: req.session,
-    prefs: { day_start: '08:00', day_end: '23:00' },
-  };
-}
-
-/** 모델이 낸 제안을 앱과 저장소가 같이 쓰는 모양으로 만든다. 할 일 후보에 due_at·due_has_time을 덧붙인다. */
-export function toStoredProposal(kind, proposal) {
-  return {
-    kind,
-    ...proposal,
-    todos: proposal.todos.map(t => ({ ...t, ...coreTodoToServer(t) })),
+    input: {
+      kind: req.kind, now: req.now, text: req.text, pasted: req.pasted,
+      todos, busy: req.busy, blocks, session: req.session,
+      prefs: { day_start: '08:00', day_end: '23:00' },
+    },
+    calibration,
   };
 }
 
@@ -92,8 +106,10 @@ export async function handleAssistant({ body, userId, deps, emit }) {
     let ctx;
     try { ctx = await db.context(userId, req.now); } catch (e) { throw fromDbError(e); }
     let cats = {};
-    try { cats = await db.threadCategories(userId); } catch (e) { throw fromDbError(e); }
-    const input = buildCoreInput(req, ctx, cats);
+    if ((ctx?.todos ?? []).some(t => !('category' in t))) {
+      try { cats = await db.threadCategories(userId); } catch (e) { throw fromDbError(e); }
+    }
+    const { input, calibration } = buildCoreInput(req, ctx, cats);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -109,11 +125,14 @@ export async function handleAssistant({ body, userId, deps, emit }) {
     } finally { clearTimeout(timer); }
     usage = result.usage; model = result.model;
 
-    const stored = toStoredProposal(req.kind, result.proposal);
+    // 저장하는 제안은 assistant/core/schema.mjs 모양 그대로다(규칙 검사에서 뺀 블록은 이미 빠져 있다).
+    const stored = result.proposal;
     let proposalId;
     try { proposalId = await db.saveProposal(userId, req.kind, { kind: req.kind, now: req.now }, stored); } catch (e) { throw fromDbError(e); }
     ok = true;
-    emit('proposal', { proposal_id: proposalId, proposal: stored, dropped: result.dropped });
+    // 제안은 만든 지 24시간이 지나면 적용할 수 없다(D가 막는다). 앱이 안내에 쓰도록 만료 시각을 같이 준다.
+    const expires_at = new Date(deps.now() + 24 * 3600 * 1000).toISOString();
+    emit('proposal', { proposal_id: proposalId, proposal: stored, dropped: result.dropped, calibration, expires_at });
   } catch (e) {
     const code = e instanceof FnError ? e.code : 'assistant_unavailable';
     emit('error', { code });

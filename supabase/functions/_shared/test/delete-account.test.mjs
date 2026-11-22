@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { BUCKET, handleDeleteAccount } from '../delete-account.mjs';
 
 const U = '11111111-1111-1111-1111-111111111111';
-function setup({ paths = [], removeFails = false, deleteFails = false } = {}) {
+function setup({ paths = [], stored = [], removeFails = false, deleteFails = false } = {}) {
   const order = [];
   return {
     order,
     deps: {
-      db: { photoPaths: async () => { order.push('paths'); return paths; } },
-      storage: { remove: async (bucket, p) => { order.push(['remove', bucket, p]); if (removeFails) throw new Error('x'); } },
+      db: { cleanupCrews: async () => { order.push('crews'); return {}; }, photoPaths: async () => { order.push('paths'); return paths; } },
+      storage: { listAll: async (b, prefix) => { order.push(['list', b, prefix]); return stored; }, remove: async (bucket, p) => { order.push(['remove', bucket, p]); if (removeFails) throw new Error('x'); } },
       auth: { deleteUser: async id => { order.push(['deleteUser', id]); if (deleteFails) throw new Error('x'); } },
     },
   };
@@ -18,19 +18,19 @@ function setup({ paths = [], removeFails = false, deleteFails = false } = {}) {
 test('사진을 먼저 지우고 그다음 사용자를 지운다', async () => {
   const { deps, order } = setup({ paths: [`${U}/s1/full.heic`, `${U}/s1/thumb.heic`, `${U}/s1/full.heic`] });
   assert.deepEqual(await handleDeleteAccount({ userId: U, deps }), { ok: true });
-  assert.deepEqual(order, ['paths', ['remove', BUCKET, [`${U}/s1/full.heic`, `${U}/s1/thumb.heic`]], ['deleteUser', U]]);
+  assert.deepEqual(order, ['crews', 'paths', ['list', BUCKET, `${U}/`], ['remove', BUCKET, [`${U}/s1/full.heic`, `${U}/s1/thumb.heic`]], ['deleteUser', U]]);
 });
 
 test('본인 폴더 밖 경로는 지우지 않는다', async () => {
   const { deps, order } = setup({ paths: [`${U}/a/full.heic`, '22222222-2222-2222-2222-222222222222/b/full.heic', '../x'] });
   await handleDeleteAccount({ userId: U, deps });
-  assert.deepEqual(order[1][2], [`${U}/a/full.heic`]);
+  assert.deepEqual(order.find(o => o[0] === 'remove')[2], [`${U}/a/full.heic`]);
 });
 
 test('사진이 없으면 저장소를 부르지 않고 사용자만 지운다', async () => {
   const { deps, order } = setup();
   await handleDeleteAccount({ userId: U, deps });
-  assert.deepEqual(order, ['paths', ['deleteUser', U]]);
+  assert.deepEqual(order, ['crews', 'paths', ['list', BUCKET, `${U}/`], ['deleteUser', U]]);
 });
 
 test('사진 삭제가 실패하면 사용자를 지우지 않는다(다시 부르면 이어서 지운다)', async () => {
@@ -49,4 +49,17 @@ test('100개 넘는 사진은 나눠서 지운다', async () => {
   const { deps, order } = setup({ paths });
   await handleDeleteAccount({ userId: U, deps });
   assert.deepEqual(order.filter(o => o[0] === 'remove').map(o => o[2].length), [100, 100, 50]);
+});
+
+test('기록에 없는 저장소 파일도 본인 폴더 아래는 전부 지운다(중복은 한 번)', async () => {
+  const { deps, order } = setup({ paths: [`${U}/s1/full.heic`], stored: [`${U}/s1/full.heic`, `${U}/orphan/x.heic`, `${U}/s1/thumb.heic`] });
+  await handleDeleteAccount({ userId: U, deps });
+  assert.deepEqual(order.find(o => o[0] === 'remove')[2].sort(), [`${U}/orphan/x.heic`, `${U}/s1/full.heic`, `${U}/s1/thumb.heic`]);
+});
+
+test('크루 정리가 실패하면 사진도 사용자도 건드리지 않는다', async () => {
+  const { deps, order } = setup({ paths: [`${U}/s/full.heic`] });
+  deps.db.cleanupCrews = async () => { order.push('crews'); throw new Error('boom'); };
+  await assert.rejects(handleDeleteAccount({ userId: U, deps }));
+  assert.deepEqual(order, ['crews']);
 });

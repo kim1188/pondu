@@ -17,7 +17,7 @@ Deno.serve(async (req: Request) => {
       body, userId,
       deps: {
         db: makeDb(admin), client, now: () => Date.now(),
-        config: { model: Deno.env.get('ASSISTANT_MODEL') || undefined, dailyLimit: num('IMPORT_DAILY_LIMIT', 30), timeoutMs: num('ASSISTANT_TIMEOUT_MS', 20000) },
+        config: { model: Deno.env.get('ASSISTANT_MODEL') || undefined, dailyLimit: num('IMPORT_DAILY_LIMIT', 20), timeoutMs: num('ASSISTANT_TIMEOUT_MS', 20000) },
       },
     });
     return jsonResponse(out);
