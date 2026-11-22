@@ -95,7 +95,7 @@ export async function normalizeItems(raw) {
 }
 
 /**
- * @param {{body: object, userId: string, deps: {db: object, client: object, now: () => number,
+ * @param {{body: any, userId: string, deps: {db: object, client: object, now: () => number,
  *   config: {model?: string, dailyLimit: number, timeoutMs: number}}}} p
  */
 export async function handleImportExtract({ body, userId, deps }) {

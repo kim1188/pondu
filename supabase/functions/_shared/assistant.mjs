@@ -69,7 +69,7 @@ export function toStoredProposal(kind, proposal) {
 
 /**
  * @param {object} p
- * @param {object} p.body        요청 본문
+ * @param {any} p.body           요청 본문(검사 전이라 어떤 값이든 올 수 있다)
  * @param {string} p.userId
  * @param {{
  *   db: {runBegin: Function, runFinish: Function, context: Function, threadCategories: Function, saveProposal: Function},

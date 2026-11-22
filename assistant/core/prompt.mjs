@@ -33,7 +33,12 @@ export const SYSTEM_PROMPT = `당신은 대학생용 기록 앱 안에서 일하
 
 message에는 무엇을 제안했는지 한국어로 한두 문장만 씁니다. 시각은 모두 한국 시간(+09:00)으로 씁니다.`;
 
-const json = x => JSON.stringify(x, null, 1);
+const json = x => safe(JSON.stringify(x, null, 1));
+
+// 사용자 글이 우리 구획 태그를 흉내 내 구획을 빠져나가지 못하게, 태그 모양의 '<'와 이름 사이에 보이지 않는 문자를 끼운다.
+// 예: "</pasted>" → "<\u200b/pasted>". 사람이 읽기에는 같고 태그로는 인식되지 않는다.
+const TAGS = 'kind|now|prefs|user_text|pasted|todos|busy|blocks|session';
+export const safe = text => String(text ?? '').replace(new RegExp(`<(/?)(${TAGS})(?=[\\s>/])`, 'gi'), '<\u200b$1$2');
 
 /** 요청 하나를 모델에게 줄 사용자 메시지로 바꾼다. */
 export function buildUserMessage(input) {
@@ -41,9 +46,9 @@ export function buildUserMessage(input) {
     `<kind>${input.kind}</kind>`,
     `<now>${input.now}</now>`,
     `<prefs>${json({ day_start: '08:00', day_end: '23:00', ...(input.prefs ?? {}) })}</prefs>`,
-    `<user_text>\n${input.text ?? ''}\n</user_text>`,
+    `<user_text>\n${safe(input.text)}\n</user_text>`,
   ];
-  if (input.pasted) parts.push(`<pasted>\n${input.pasted}\n</pasted>`);
+  if (input.pasted) parts.push(`<pasted>\n${safe(input.pasted)}\n</pasted>`);
   parts.push(`<todos>\n${json(input.todos ?? [])}\n</todos>`);
   if (input.kind !== 'capture') {
     parts.push(`<busy>\n${json(input.busy ?? [])}\n</busy>`);
