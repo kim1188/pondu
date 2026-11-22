@@ -3,7 +3,7 @@ do $$
 declare sc uuid := c_t_school(); a uuid := c_t_user('a', sc); b uuid := c_t_user('b', sc); n int; f text; r record;
   pub text[] := array['send_friend_request','respond_friend_request','remove_friend','block_user','unblock_user',
     'list_friends','list_friend_requests','create_crew','join_crew','leave_crew','remove_crew_member','list_my_crews',
-    'list_crew_members','get_feed','get_thread_history','set_reaction','add_comment','list_comments','delete_comment',
+    'list_crew_members','rotate_invite_code','get_feed','get_thread_history','set_reaction','add_comment','list_comments','delete_comment',
     'report_session'];
 begin
   -- 모든 공개 함수: security definer, search_path 고정, authenticated만 실행, anon·public 불가

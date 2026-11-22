@@ -97,6 +97,7 @@ begin
     'share_title', p_session.share_title,
     'progress_note', p_session.progress_note,
     'visibility', p_session.visibility,
+    'group_id', p_session.group_id,
     'end_corrected', p_session.end_corrected,
     'offline_started_at', b_iso(p_session.offline_started_at));
 end $$;
@@ -169,6 +170,44 @@ begin
   return v;
 end $$;
 
+-- crew 공개일 때 세션이 묶일 크루를 정한다. crew가 아니면 null.
+--  1) p_group 이 있으면 내가 그 크루의 활동 중인 구성원이어야 한다(아니면 not_found)
+--  2) p_current(이미 묶인 크루, 공유 범위 수정 때)가 아직 유효하면 그것
+--  3) 이어가는 일의 default_group_id 가 아직 유효하면 그것
+--  4) 내가 속한 크루가 정확히 하나면 그 크루
+--  5) 그 밖에는 invalid_input
+create or replace function b_resolve_group(p_user uuid, p_vis visibility, p_group uuid, p_thread uuid, p_current uuid default null)
+returns uuid language plpgsql stable set search_path = public as $$
+declare
+  v_g uuid;
+  v_n int;
+begin
+  if p_vis is distinct from 'crew' then return null; end if;
+  if p_group is not null then
+    if not exists (select 1 from group_members m join groups g on g.id = m.group_id and g.kind = 'crew'
+                    where m.group_id = p_group and m.user_id = p_user and m.status = 'active') then
+      raise exception using errcode = 'P0001', message = 'not_found';
+    end if;
+    return p_group;
+  end if;
+  for v_g in
+    select c from (select p_current as c, 1 as o
+                   union all
+                   select default_group_id, 2 from threads where id = p_thread and user_id = p_user) x
+    where c is not null order by o
+  loop
+    if exists (select 1 from group_members m join groups g on g.id = m.group_id and g.kind = 'crew'
+                where m.group_id = v_g and m.user_id = p_user and m.status = 'active') then
+      return v_g;
+    end if;
+  end loop;
+  select count(*), min(m.group_id::text)::uuid into v_n, v_g
+    from group_members m join groups g on g.id = m.group_id and g.kind = 'crew'
+   where m.user_id = p_user and m.status = 'active';
+  if v_n = 1 then return v_g; end if;
+  raise exception using errcode = 'P0001', message = 'invalid_input';
+end $$;
+
 -- ── 공개 함수 ──
 create or replace function start_session(
   p_client_id uuid,
@@ -181,10 +220,12 @@ create or replace function start_session(
   p_tags text[] default null,
   p_share_title text default null,
   p_joined_session_id uuid default null,
-  p_offline_started_at timestamptz default null
+  p_offline_started_at timestamptz default null,
+  p_group_id uuid default null
 ) returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_uid uuid := auth.uid();
+  v_group uuid;
   v_now timestamptz := now();
   v_existing sessions;
   v_row sessions;
@@ -252,6 +293,7 @@ begin
   if v_vis in ('department', 'school') then
     raise exception using errcode = 'P0001', message = 'visibility_not_available';
   end if;
+  v_group := b_resolve_group(v_uid, v_vis, p_group_id, v_thread);
 
   -- 같이 하기: 상대 세션이 진행 중이고 내가 볼 수 있어야 한다.
   if p_joined_session_id is not null then
@@ -285,10 +327,10 @@ begin
   begin
     insert into sessions (user_id, client_id, thread_id, todo_id, plan_block_id, joined_session_id,
                           primary_category, tags, started_at, status, capture_mode, share_title,
-                          visibility, offline_started_at, created_at)
+                          visibility, group_id, offline_started_at, created_at)
     values (v_uid, p_client_id, v_thread, v_todo, v_block, p_joined_session_id,
             p_primary_category, v_tags, v_started, 'live', p_capture_mode, v_title,
-            v_vis, v_offline, v_now)
+            v_vis, v_group, v_offline, v_now)
     returning * into v_row;
   exception when unique_violation then
     get stacked diagnostics v_constraint = constraint_name;
@@ -449,14 +491,17 @@ begin
   return session_json(v);
 end $$;
 
--- 공개 범위, 공유용 제목, 진척 메모만 바꾼다. 제목과 메모는 넘긴 값으로 바뀐다(null이면 지운다). 범위가 null이면 그대로.
+-- 공개 범위, 공유용 제목, 진척 메모, 크루만 바꾼다. 제목과 메모는 넘긴 값으로 바뀐다(null이면 지운다). 범위가 null이면 그대로.
+-- 공개 범위가 crew이면 p_group_id 규칙은 start_session과 같고(없으면 지금 묶인 크루부터 본다), crew가 아니면 group_id는 null.
 create or replace function update_session_share(
-  p_session_id uuid, p_visibility visibility default null, p_share_title text default null, p_progress_note text default null
+  p_session_id uuid, p_visibility visibility default null, p_share_title text default null, p_progress_note text default null,
+  p_group_id uuid default null
 ) returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v sessions;
   v_title text := nullif(btrim(p_share_title), '');
   v_note text := nullif(btrim(p_progress_note), '');
+  v_vis visibility;
 begin
   if auth.uid() is null then raise exception using errcode = 'P0001', message = 'not_authenticated'; end if;
   if (v_title is not null and char_length(v_title) > 60) or (v_note is not null and char_length(v_note) > 200) then
@@ -466,8 +511,10 @@ begin
   if p_visibility in ('department', 'school') then
     raise exception using errcode = 'P0001', message = 'visibility_not_available';
   end if;
+  v_vis := coalesce(p_visibility, v.visibility);
   update sessions
-     set visibility = coalesce(p_visibility, visibility), share_title = v_title, progress_note = v_note
+     set visibility = v_vis, share_title = v_title, progress_note = v_note,
+         group_id = b_resolve_group(v.user_id, v_vis, p_group_id, v.thread_id, v.group_id)
    where id = v.id returning * into v;
   perform b_log_event(v.id, 'share_update', jsonb_build_object('visibility', v.visibility));
   return session_json(v);
@@ -617,7 +664,7 @@ begin
   for r in select p.oid::regprocedure as sig, p.proname from pg_proc p
            where p.pronamespace = 'public'::regnamespace
              and p.proname in ('b_sessions_guard', 'b_iso', 'b_limit_seconds', 'b_net_seconds', 'session_json', 'b_split_days',
-                               'b_apply_daily_stats', 'b_start_links', 'b_over_limit', 'b_log_event', 'b_my_session_locked',
+                               'b_apply_daily_stats', 'b_start_links', 'b_over_limit', 'b_resolve_group', 'b_log_event', 'b_my_session_locked',
                                'sweep_stale_sessions') loop
     execute format('revoke all on function %s from public, anon, authenticated', r.sig);
   end loop;
