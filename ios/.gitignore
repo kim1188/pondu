@@ -1,0 +1,9 @@
+# XcodeGen이 만드는 것
+*.xcodeproj
+*.xcworkspace
+# Xcode, SwiftPM
+xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+*.xcuserstate
