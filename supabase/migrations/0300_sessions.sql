@@ -58,6 +58,12 @@ returns int language sql stable as $$
           else p_at end) - p_session.started_at))::int - p_session.paused_seconds)
 $$;
 
+-- 한도는 started_at 부터의 실제 경과 시간(정지 포함)으로 센다.
+create or replace function b_over_limit(p_session sessions, p_at timestamptz default now())
+returns boolean language sql stable as $$
+  select extract(epoch from p_at - p_session.started_at) > b_limit_seconds(p_session.primary_category)
+$$;
+
 create or replace function session_json(p_session sessions) returns jsonb language plpgsql stable as $$
 declare
   v_dur int;
@@ -65,7 +71,7 @@ begin
   if p_session.status = 'ended' then
     v_dur := greatest(0, floor(extract(epoch from p_session.ended_at - p_session.started_at))::int - p_session.paused_seconds);
   elsif p_session.status = 'needs_confirmation' then
-    v_dur := least(b_net_seconds(p_session), b_limit_seconds(p_session.primary_category));
+    v_dur := null;
   else
     v_dur := b_net_seconds(p_session);
   end if;
@@ -133,8 +139,8 @@ begin
                 session_count = daily_stats.session_count + excluded.session_count;
 end $$;
 
--- 세션이 끝났을 때 연결된 예정 시간과 할 일을 정리한다(할 일 완료는 건드리지 않는다).
-create or replace function b_finish_links(p_session sessions) returns void language plpgsql as $$
+-- 세션을 시작할 때 연결된 예정 시간은 started, 열린 할 일은 in_progress 로(할 일 완료는 건드리지 않는다).
+create or replace function b_start_links(p_session sessions) returns void language plpgsql as $$
 begin
   if p_session.plan_block_id is not null then
     update plan_blocks set status = 'started'
@@ -167,8 +173,8 @@ end $$;
 create or replace function start_session(
   p_client_id uuid,
   p_primary_category category,
-  p_capture_mode capture_mode default 'no_photo',
-  p_visibility visibility default 'private',
+  p_capture_mode capture_mode default null,
+  p_visibility visibility default null,
   p_thread_id uuid default null,
   p_todo_id uuid default null,
   p_plan_block_id uuid default null,
@@ -192,7 +198,8 @@ declare
   v_joined sessions;
   v_constraint text;
   v_tmp uuid;
-  v_owner uuid;
+  v_thread_vis visibility;
+  v_vis visibility;
 begin
   if v_uid is null then
     raise exception using errcode = 'P0001', message = 'not_authenticated';
@@ -210,11 +217,10 @@ begin
   if not exists (select 1 from profiles where id = v_uid) then
     raise exception using errcode = 'P0001', message = 'profile_required';
   end if;
-  if p_visibility is null then p_visibility := 'private'; end if;
-  if p_capture_mode is null then p_capture_mode := 'no_photo'; end if;
   if p_visibility in ('department', 'school') then
     raise exception using errcode = 'P0001', message = 'visibility_not_available';
   end if;
+  if p_capture_mode is null then p_capture_mode := 'no_photo'; end if;
   if v_title is not null and char_length(v_title) > 60 then
     raise exception using errcode = 'P0001', message = 'invalid_input';
   end if;
@@ -222,27 +228,29 @@ begin
     raise exception using errcode = 'P0001', message = 'invalid_input';
   end if;
 
-  if exists (select 1 from sessions where user_id = v_uid and status in ('live', 'paused')) then
+  if exists (select 1 from sessions where user_id = v_uid and status in ('live', 'paused', 'needs_confirmation')) then
     raise exception using errcode = 'P0001', message = 'session_already_active';
   end if;
 
-  -- 연결 대상은 모두 내 것이어야 한다(남의 것이면 forbidden, 없으면 not_found). 비어 있는 쪽은 연결된 쪽에서 채운다.
+  -- 연결 대상은 모두 내 것이어야 한다(남의 것이든 없든 not_found). 비어 있는 쪽은 연결된 쪽에서 채운다.
   if v_block is not null then
-    select user_id, todo_id, coalesce(v_thread, thread_id) into v_owner, v_tmp, v_thread
-      from plan_blocks where id = v_block;
+    select todo_id, coalesce(v_thread, thread_id) into v_tmp, v_thread
+      from plan_blocks where id = v_block and user_id = v_uid;
     if not found then raise exception using errcode = 'P0001', message = 'not_found'; end if;
-    if v_owner <> v_uid then raise exception using errcode = 'P0001', message = 'forbidden'; end if;
     v_todo := coalesce(v_todo, v_tmp);
   end if;
   if v_todo is not null then
-    select user_id, coalesce(v_thread, thread_id) into v_owner, v_thread from todos where id = v_todo;
+    select coalesce(v_thread, thread_id) into v_thread from todos where id = v_todo and user_id = v_uid;
     if not found then raise exception using errcode = 'P0001', message = 'not_found'; end if;
-    if v_owner <> v_uid then raise exception using errcode = 'P0001', message = 'forbidden'; end if;
   end if;
   if v_thread is not null then
-    select user_id into v_owner from threads where id = v_thread;
+    select default_visibility into v_thread_vis from threads where id = v_thread and user_id = v_uid;
     if not found then raise exception using errcode = 'P0001', message = 'not_found'; end if;
-    if v_owner <> v_uid then raise exception using errcode = 'P0001', message = 'forbidden'; end if;
+  end if;
+  -- 공개 범위를 안 주면 이어가는 일의 기본값, 없으면 private
+  v_vis := coalesce(p_visibility, v_thread_vis, 'private');
+  if v_vis in ('department', 'school') then
+    raise exception using errcode = 'P0001', message = 'visibility_not_available';
   end if;
 
   -- 같이 하기: 상대 세션이 진행 중이고 내가 볼 수 있어야 한다.
@@ -280,7 +288,7 @@ begin
                           visibility, offline_started_at, created_at)
     values (v_uid, p_client_id, v_thread, v_todo, v_block, p_joined_session_id,
             p_primary_category, v_tags, v_started, 'live', p_capture_mode, v_title,
-            p_visibility, v_offline, v_now)
+            v_vis, v_offline, v_now)
     returning * into v_row;
   exception when unique_violation then
     get stacked diagnostics v_constraint = constraint_name;
@@ -292,6 +300,7 @@ begin
     raise;
   end;
 
+  perform b_start_links(v_row);
   perform b_log_event(v_row.id, 'start', jsonb_build_object(
     'received_at', b_iso(v_now), 'offline', v_offline is not null, 'joined_session_id', p_joined_session_id));
   if p_joined_session_id is not null then
@@ -360,7 +369,7 @@ begin
     raise exception using errcode = 'P0001', message = 'session_not_active';
   end if;
 
-  if b_net_seconds(v, v_now) > b_limit_seconds(v.primary_category) then
+  if b_over_limit(v, v_now) then
     update sessions set status = 'needs_confirmation', outcome = p_outcome, progress_note = v_note
      where id = v.id returning * into v;
     perform b_log_event(v.id, 'needs_confirmation', jsonb_build_object(
@@ -377,19 +386,17 @@ begin
          outcome = p_outcome, progress_note = v_note
    where id = v.id returning * into v;
   perform b_apply_daily_stats(v);
-  perform b_finish_links(v);
   perform b_log_event(v.id, 'end', jsonb_build_object('outcome', p_outcome));
   return session_json(v);
 end $$;
 
--- 종료 확인: 사용자가 종료 시각을 정한다. 시작 이후, 지금 이전, 한도 이내여야 한다.
+-- 종료 확인: 사용자가 종료 시각을 정한다. 시작 이후, 지금 이전, 시작+한도 이내여야 한다.
 create or replace function confirm_end(p_session_id uuid, p_ended_at timestamptz) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   v sessions;
   v_now timestamptz := now();
   v_pause int;
-  v_net int;
 begin
   if auth.uid() is null then raise exception using errcode = 'P0001', message = 'not_authenticated'; end if;
   if p_ended_at is null then raise exception using errcode = 'P0001', message = 'invalid_input'; end if;
@@ -405,8 +412,7 @@ begin
   if v.paused_at is not null and p_ended_at > v.paused_at then
     v_pause := v_pause + floor(extract(epoch from p_ended_at - v.paused_at))::int;
   end if;
-  v_net := floor(extract(epoch from p_ended_at - v.started_at))::int - v_pause;
-  if v_net > b_limit_seconds(v.primary_category) then
+  if extract(epoch from p_ended_at - v.started_at) > b_limit_seconds(v.primary_category) then
     raise exception using errcode = 'P0001', message = 'invalid_input';
   end if;
 
@@ -414,7 +420,6 @@ begin
      set status = 'ended', ended_at = p_ended_at, paused_seconds = v_pause, paused_at = null, end_corrected = true
    where id = v.id returning * into v;
   perform b_apply_daily_stats(v);
-  perform b_finish_links(v);
   perform b_log_event(v.id, 'confirm_end', jsonb_build_object(
     'ended_at', b_iso(p_ended_at), 'confirmed_at', b_iso(v_now)));
   return session_json(v);
@@ -474,7 +479,8 @@ declare
   v sessions;
 begin
   if auth.uid() is null then raise exception using errcode = 'P0001', message = 'not_authenticated'; end if;
-  select * into v from sessions where user_id = auth.uid() and status in ('live', 'paused');
+  select * into v from sessions where user_id = auth.uid() and status in ('live', 'paused', 'needs_confirmation')
+  order by started_at desc limit 1;
   if not found then return null; end if;
   return session_json(v);
 end $$;
@@ -527,7 +533,7 @@ begin
 end $$;
 
 -- 기록 탭 한 화면. 날짜는 Asia/Seoul 기준(daily_stats). 다른 시간대는 invalid_input.
-create or replace function get_record_summary(p_from date, p_to date, p_tz text default 'Asia/Seoul')
+create or replace function get_record_summary(p_from date, p_to date, p_tz text default null)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare
   v_uid uuid := auth.uid();
@@ -583,7 +589,7 @@ declare
 begin
   with hit as (
     update sessions s set status = 'needs_confirmation'
-    where s.status in ('live', 'paused') and b_net_seconds(s) > b_limit_seconds(s.primary_category)
+    where s.status in ('live', 'paused') and b_over_limit(s)
     returning s.id, b_net_seconds(s) as net, b_limit_seconds(s.primary_category) as lim
   ), ev as (
     insert into session_events (session_id, type, payload)
@@ -611,7 +617,7 @@ begin
   for r in select p.oid::regprocedure as sig, p.proname from pg_proc p
            where p.pronamespace = 'public'::regnamespace
              and p.proname in ('b_sessions_guard', 'b_iso', 'b_limit_seconds', 'b_net_seconds', 'session_json', 'b_split_days',
-                               'b_apply_daily_stats', 'b_finish_links', 'b_log_event', 'b_my_session_locked',
+                               'b_apply_daily_stats', 'b_start_links', 'b_over_limit', 'b_log_event', 'b_my_session_locked',
                                'sweep_stale_sessions') loop
     execute format('revoke all on function %s from public, anon, authenticated', r.sig);
   end loop;

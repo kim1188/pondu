@@ -1,9 +1,9 @@
 -- 흐름 B 테스트 공용 도우미. 다른 테스트 파일이 \ir 로 불러 쓴다. 이 파일 자체는 아무것도 검사하지 않는다.
-create schema if not exists tt;
-grant usage on schema tt to public;
+create schema if not exists tt_b;
+grant usage on schema tt_b to public;
 
 -- 학교 1개와 프로필이 있는 사용자를 만든다.
-create or replace function tt.mk_user(p_name text) returns uuid language plpgsql as $$
+create or replace function tt_b.mk_user(p_name text) returns uuid language plpgsql as $$
 declare
   v uuid := gen_random_uuid();
   sch uuid;
@@ -18,13 +18,13 @@ begin
   return v;
 end $$;
 
-create or replace function tt.assert(p_cond boolean, p_msg text) returns void language plpgsql as $$
+create or replace function tt_b.assert(p_cond boolean, p_msg text) returns void language plpgsql as $$
 begin
   if p_cond is not true then raise exception 'ASSERT FAILED: %', p_msg; end if;
 end $$;
 
 -- p_sql 이 정확히 p_code 오류로 실패해야 한다. 호출한 역할 그대로 실행한다.
-create or replace function tt.expect_err(p_sql text, p_code text) returns void language plpgsql as $$
+create or replace function tt_b.expect_err(p_sql text, p_code text) returns void language plpgsql as $$
 declare
   ok boolean := false;
 begin
@@ -40,7 +40,7 @@ begin
 end $$;
 
 -- 권한 오류(permission denied 등)로 실패해야 한다.
-create or replace function tt.expect_denied(p_sql text) returns void language plpgsql as $$
+create or replace function tt_b.expect_denied(p_sql text) returns void language plpgsql as $$
 declare
   ok boolean := false;
 begin
@@ -56,7 +56,7 @@ begin
 end $$;
 
 -- 관리자 권한으로 세션의 시각을 과거로 민다(한도·자정 테스트용). 변경 방지 트리거를 잠깐 끈다.
-create or replace function tt.backdate(p_session uuid, p_by interval) returns void language plpgsql as $$
+create or replace function tt_b.backdate(p_session uuid, p_by interval) returns void language plpgsql as $$
 begin
   alter table sessions disable trigger b_sessions_guard;
   update sessions set started_at = started_at - p_by,
@@ -86,7 +86,7 @@ begin
   end if;
 end $$;
 
-create or replace function tt.befriend(p_a uuid, p_b uuid) returns void language plpgsql as $$
+create or replace function tt_b.befriend(p_a uuid, p_b uuid) returns void language plpgsql as $$
 begin
   insert into friendships (user_a, user_b, status, requested_by)
   values (least(p_a, p_b), greatest(p_a, p_b), 'accepted', p_a)
