@@ -162,6 +162,13 @@ final class UserDefaultsConsent: ConsentStoring {
 
 // MARK: - 비서 모델
 
+final class TimeoutFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _fired = false
+    var fired: Bool { lock.lock(); defer { lock.unlock() }; return _fired }
+    func fire() { lock.lock(); _fired = true; lock.unlock() }
+}
+
 enum AssistantKind: String, Sendable { case capture, planDay = "plan_day", reschedule }
 
 @MainActor @Observable
@@ -188,6 +195,7 @@ final class AssistantModel {
     @ObservationIgnored private let consent: ConsentStoring
     @ObservationIgnored private let sessionSignal: SessionEndSignal?
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var readerTask: Task<AssistantStreamState, Never>?
     @ObservationIgnored static let timeout: UInt64 = 20_000_000_000      // 비서 20초
 
     init(kind: AssistantKind, text: String = "", today: TodayModel, consent: ConsentStoring, signal: SessionEndSignal? = nil) {
@@ -204,7 +212,7 @@ final class AssistantModel {
     }
     private var isFailed: Bool { if case .failed = phase { return true } else { return false } }
 
-    func cancel() { task?.cancel(); task = nil }
+    func cancel() { task?.cancel(); readerTask?.cancel(); task = nil }
 
     func send() {
         guard canSend else { return }
@@ -218,27 +226,37 @@ final class AssistantModel {
         let busy = await today.busyForAssistant(days: kind == .reschedule ? 2 : 1)
         let body = Self.requestBody(kind: kind, text: inputText, now: today.now, timeZone: today.timeZone,
                                     busy: busy, session: sessionSignal)
-        var state = AssistantStreamState()
         let stream = today.backend.stream(function: "assistant", body: body)
-        let reader = Task {
-            do { for try await ev in stream { AssistantStream.reduce(&state, event: ev); await self.publish(state) } }
-            catch { state.errorCode = (error as? BackendError)?.code ?? "unknown" }
-            return state
+        let flag = TimeoutFlag()
+        let reader = Task { [weak self] () -> AssistantStreamState in
+            var local = AssistantStreamState()
+            do {
+                for try await ev in stream {
+                    AssistantStream.reduce(&local, event: ev)
+                    let snapshot = local
+                    await self?.publish(snapshot)
+                }
+            } catch {
+                if !(error is CancellationError) { local.errorCode = (error as? BackendError)?.code ?? "unknown" }
+            }
+            return local
         }
-        let timer = Task { [reader] in
+        readerTask = reader
+        // 비서 요청 시간 제한 20초: 넘으면 읽기를 끊고 직접 입력으로 넘긴다.
+        let timer = Task {
             try? await Task.sleep(nanoseconds: Self.timeout)
-            if !reader.isCancelled { reader.cancel() }
+            if !Task.isCancelled { flag.fire(); reader.cancel() }
         }
-        state = await reader.value
-        let timedOut = timer.isCancelled == false && state.envelopeData == nil && state.errorCode == nil && !Task.isCancelled
+        let state = await reader.value
         timer.cancel()
-        finish(state, timedOut: timedOut)
+        readerTask = nil
+        finish(state, timedOut: flag.fired)
     }
 
     private func publish(_ state: AssistantStreamState) { message = state.message }
 
     private func finish(_ state: AssistantStreamState, timedOut: Bool) {
-        if Task.isCancelled && state.envelopeData == nil { phase = .idle; return }
+        if task?.isCancelled == true && state.envelopeData == nil && !timedOut { phase = .idle; return }
         if let code = state.errorCode { phase = .failed(code: code); return }
         if let env = AssistantStream.envelope(from: state) {
             envelope = env
