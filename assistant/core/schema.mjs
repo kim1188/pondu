@@ -10,6 +10,8 @@ export const PROPOSAL_SCHEMA = {
   additionalProperties: false,
   required: ['todos', 'blocks', 'done_todo_ids', 'unscheduled', 'questions', 'message'],
   properties: {
+    // message를 맨 앞에 둔다: 모델이 속성을 스키마 순서대로 쓰므로, 서버가 message를 먼저 흘려보낼 수 있다.
+    message: { type: 'string', description: '사용자에게 보여 줄 한두 문장.' },
     todos: {
       type: 'array',
       description: '새로 만들 할 일 후보. 이미 있는 할 일은 다시 넣지 않는다.',
@@ -60,7 +62,6 @@ export const PROPOSAL_SCHEMA = {
       description: '진행하려면 꼭 확인해야 하는 것만. 없으면 빈 배열.',
       items: { type: 'string' },
     },
-    message: { type: 'string', description: '사용자에게 보여 줄 한두 문장.' },
   },
 };
 

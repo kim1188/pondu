@@ -23,6 +23,7 @@ export const SYSTEM_PROMPT = `당신은 대학생용 기록 앱 안에서 일하
 - busy(고정 일정)와 잠긴 계획(locked)은 건드리지 않고 겹치지도 않습니다. 사용자가 이번 입력에서 비워 달라고 한 시간도 같습니다.
 - now 이후, 활동 시간대(prefs.day_start~day_end) 안에만 잡습니다. 한 블록은 10분 이상 4시간 이하입니다.
 - 마감이 있는 일은 마감 전에 끝나도록 잡고, 마감이 가까운 일을 먼저 잡습니다.
+- 할 일에 planning_min이 있으면 그것은 이 사용자의 과거 기록(실제 걸린 시간 ÷ 예상)으로 보정한 예상 시간입니다. 블록 길이는 estimate_min 대신 planning_min을 기준으로 잡습니다. 새로 제안하는 할 일의 estimate_min은 사용자가 말한 값 그대로 두고 보정하지 않습니다.
 - 시간이 모자라면 억지로 끼워 넣지 말고, 못 넣은 일을 unscheduled에 이유와 함께 적습니다.
 - reschedule에서 blocks는 잠기지 않은 앞으로의 계획 전체를 대체합니다. 그대로 둘 블록도 다시 적어야 유지됩니다.
 - 사용자가 방금 끝냈다고 한 일이나 이미 끝난 일에는 시간을 잡지 않습니다.
@@ -32,7 +33,12 @@ export const SYSTEM_PROMPT = `당신은 대학생용 기록 앱 안에서 일하
 
 message에는 무엇을 제안했는지 한국어로 한두 문장만 씁니다. 시각은 모두 한국 시간(+09:00)으로 씁니다.`;
 
-const json = x => JSON.stringify(x, null, 1);
+const json = x => safe(JSON.stringify(x, null, 1));
+
+// 사용자 글이 우리 구획 태그를 흉내 내 구획을 빠져나가지 못하게, 태그 모양의 '<'와 이름 사이에 보이지 않는 문자를 끼운다.
+// 예: "</pasted>" → "<\u200b/pasted>". 사람이 읽기에는 같고 태그로는 인식되지 않는다.
+const TAGS = 'kind|now|prefs|user_text|pasted|todos|busy|blocks|session';
+export const safe = text => String(text ?? '').replace(new RegExp(`<(/?)(${TAGS})(?=[\\s>/])`, 'gi'), '<\u200b$1$2');
 
 /** 요청 하나를 모델에게 줄 사용자 메시지로 바꾼다. */
 export function buildUserMessage(input) {
@@ -40,9 +46,9 @@ export function buildUserMessage(input) {
     `<kind>${input.kind}</kind>`,
     `<now>${input.now}</now>`,
     `<prefs>${json({ day_start: '08:00', day_end: '23:00', ...(input.prefs ?? {}) })}</prefs>`,
-    `<user_text>\n${input.text ?? ''}\n</user_text>`,
+    `<user_text>\n${safe(input.text)}\n</user_text>`,
   ];
-  if (input.pasted) parts.push(`<pasted>\n${input.pasted}\n</pasted>`);
+  if (input.pasted) parts.push(`<pasted>\n${safe(input.pasted)}\n</pasted>`);
   parts.push(`<todos>\n${json(input.todos ?? [])}\n</todos>`);
   if (input.kind !== 'capture') {
     parts.push(`<busy>\n${json(input.busy ?? [])}\n</busy>`);

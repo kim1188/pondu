@@ -6,6 +6,8 @@
   "description": "비서의 프롬프트, 출력 형식, 규칙 검사와 그 시험 세트",
   "scripts": {
     "selftest": "node eval/selftest.mjs",
+    "test": "node --test \"test/*.test.mjs\" \"../supabase/functions/_shared/test/*.test.mjs\"",
+    "sync": "node sync-core.mjs",
     "cases": "node eval/selftest.mjs --write-cases-md"
   },
   "dependencies": {
