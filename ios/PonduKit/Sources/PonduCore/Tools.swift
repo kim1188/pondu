@@ -25,32 +25,37 @@ public final class Locked<Value>: @unchecked Sendable {
 
 /// 입력이 멈춘 뒤에만 실행한다(기본 0.3초). 새 입력이 오면 이전 실행은 취소된다.
 /// 취소는 `action` 안의 `await`에도 전달되므로 이전 요청이 함께 취소된다.
-@MainActor
-public final class Debouncer {
-    public let delay: TimeInterval
-    private var task: Task<Void, Never>?
+public final class Debouncer: @unchecked Sendable {
+    public let delay: Duration
+    private let task = Locked<Task<Void, Never>?>(nil)
 
-    public init(delay: TimeInterval = 0.3) {
+    public init(delay: Duration = .milliseconds(300)) {
         self.delay = delay
     }
 
-    public func schedule(_ action: @escaping @MainActor () async -> Void) {
-        task?.cancel()
+    /// 새 호출이 오면 이전 대기와 이전 실행(그 안의 `await`)을 취소한다.
+    public func schedule(_ action: @escaping @Sendable () async -> Void) {
         let delay = self.delay
-        task = Task { @MainActor in
+        let new = Task {
             do {
-                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                try await Task.sleep(for: delay)
             } catch {
                 return
             }
             guard !Task.isCancelled else { return }
             await action()
         }
+        task.withValue { current in
+            current?.cancel()
+            current = new
+        }
     }
 
     public func cancel() {
-        task?.cancel()
-        task = nil
+        task.withValue { current in
+            current?.cancel()
+            current = nil
+        }
     }
 }
 

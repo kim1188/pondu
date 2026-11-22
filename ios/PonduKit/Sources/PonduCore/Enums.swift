@@ -1,7 +1,7 @@
 import Foundation
 
 /// 활동 분야. 원시값은 서버 enum `category` 그대로.
-public enum Category: String, Codable, CaseIterable, Sendable, Hashable, Identifiable {
+public enum ActivityCategory: String, Codable, CaseIterable, Sendable, Hashable, Identifiable {
     case study
     case coding
     case exercise
@@ -10,9 +10,21 @@ public enum Category: String, Codable, CaseIterable, Sendable, Hashable, Identif
     case parttime
 
     public var id: String { rawValue }
+
+    /// snake_case(`venture_research_intern`)와 camelCase(`ventureResearchIntern`) 키를 모두 받는다.
+    /// 디코더의 키 변환이 분야를 키로 쓰는 객체(`estimate_factors` 등)의 키까지 바꾸기 때문이다.
+    public init?(serverKey: String) {
+        if let exact = ActivityCategory(rawValue: serverKey) { self = exact; return }
+        let lowered = serverKey.lowercased()
+        if let match = ActivityCategory.allCases.first(where: { $0.rawValue.replacingOccurrences(of: "_", with: "") == lowered.replacingOccurrences(of: "_", with: "") }) {
+            self = match
+            return
+        }
+        return nil
+    }
 }
 
-public enum Visibility: String, Codable, CaseIterable, Sendable, Hashable {
+public enum ShareVisibility: String, Codable, CaseIterable, Sendable, Hashable {
     case `private`
     case friends
     case crew
@@ -31,7 +43,7 @@ public enum Visibility: String, Codable, CaseIterable, Sendable, Hashable {
     }
 
     /// 지금 고를 수 있는 단계.
-    public static let selectable: [Visibility] = [.private, .friends, .crew]
+    public static let selectable: [ShareVisibility] = [.private, .friends, .crew]
 }
 
 public enum SessionStatus: String, Codable, CaseIterable, Sendable, Hashable {
@@ -102,7 +114,7 @@ public struct Page<T: Decodable & Sendable>: Decodable, Sendable {
     public var items: [T]
     public var nextCursor: String?
 
-    public init(items: [T], nextCursor: String? = nil) {
+    public init(items: [T] = [], nextCursor: String? = nil) {
         self.items = items
         self.nextCursor = nextCursor
     }

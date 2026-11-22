@@ -54,13 +54,13 @@ public struct ErrorRetryView: View {
     private let message: String
     private let retry: () -> Void
 
-    public init(message: String, retry: @escaping () -> Void) {
+    public init(message: String, onRetry: @escaping () -> Void) {
         self.message = message
-        self.retry = retry
+        self.retry = onRetry
     }
 
-    public init(error: Error, retry: @escaping () -> Void) {
-        self.init(message: error.ponduMessage, retry: retry)
+    public init(error: Error, onRetry: @escaping () -> Void) {
+        self.init(message: error.ponduMessage, onRetry: onRetry)
     }
 
     public var body: some View {

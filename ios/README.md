@@ -89,6 +89,6 @@ SUPABASE_ANON_KEY = eyJ...공개용 키...
 - 서버 호출은 `deps.backend`로만 합니다. 시험에서는 `PonduCore`의 `FakeBackend`, `FakeAuthService`, `FakeSessionController`를 씁니다.
 - 로그아웃하면 `Notification.Name.ponduDidSignOut`가 옵니다. 각 기능은 자기 기기 저장분(SwiftData, 캐시 파일)과 예약한 로컬 알림을 지웁니다. 이미지 캐시와 내 프로필 캐시는 F가 지웁니다.
 - SwiftData를 쓰는 기능은 저장소 이름을 직접 붙입니다(`ModelConfiguration("pondu-record", ...)`처럼). 이름 없는 기본 저장소는 서로 부딪힙니다. F의 프로필 저장소 이름은 `pondu-profile`입니다.
-- 서버가 주는 시각은 `PonduJSON.makeDecoder()`가 읽습니다. 분야 이름을 키로 쓰는 사전(`estimate_factors`, `by_category`)은 `[String: ...]`로 받고 키는 `Category.rawValue`(`venture_research_intern` 포함)로 조회합니다.
+- 서버가 주는 시각은 `PonduJSON.makeDecoder()`가 읽습니다. 분야 이름을 키로 쓰는 사전(`estimate_factors`, `by_category`)은 `[String: ...]`로 받고 키는 `ActivityCategory.rawValue`(`venture_research_intern` 포함)로 조회합니다.
 - 사진 올리기는 `deps.backend.upload(path:fileURL:contentType:)`입니다. 파일은 전송이 끝날 때까지 지우지 마세요(앱 지원 폴더 권장). 앱이 종료됐다 다시 뜨면 결과 알림이 오지 않으므로 대기 중인 사진은 앱 시작 때 다시 올립니다(같은 경로 덮어쓰기라 안전합니다).
 - 설정 화면은 앱 껍데기가 왼쪽 위 톱니 버튼으로 엽니다. 탭 화면이 자기 툴바에 두고 싶으면 `SettingsButton()`을 쓰면 됩니다(`\.showSettings` 환경값).

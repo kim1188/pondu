@@ -54,7 +54,7 @@ public enum Theme {
     }
 }
 
-extension Category {
+extension ActivityCategory {
     public var displayName: String {
         switch self {
         case .study: return "공부"

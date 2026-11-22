@@ -64,6 +64,25 @@ final class CodecTests: XCTestCase {
         XCTAssertEqual(holder.estimateFactors["study"], 1.5)
     }
 
+    func testServerKeyAcceptsSnakeAndCamel() {
+        XCTAssertEqual(ActivityCategory(serverKey: "venture_research_intern"), .ventureResearchIntern)
+        XCTAssertEqual(ActivityCategory(serverKey: "ventureResearchIntern"), .ventureResearchIntern)
+        XCTAssertEqual(ActivityCategory(serverKey: "study"), .study)
+        XCTAssertNil(ActivityCategory(serverKey: "nope"))
+    }
+
+    func testAllDefaultInitsExist() {
+        _ = StartSessionRequest()
+        _ = SessionDTO()
+        _ = FeedCardDTO()
+        _ = CrewMemberDTO()
+        _ = FriendRequestsDTO()
+        _ = BackendError()
+        _ = ServerEvent()
+        let page: Page<TodoDTO> = Page()
+        XCTAssertTrue(page.items.isEmpty)
+    }
+
     func testEncodeThenDecodeRoundTrip() throws {
         let profile = Profile(id: UUID(), handle: "kim_1", displayName: "김", schoolId: UUID())
         let json = try PonduJSON.jsonValue(profile)

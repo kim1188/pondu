@@ -99,6 +99,9 @@ public enum PonduJSON {
         dayFormatter.date(from: text)
     }
 
+    /// 공용 디코더(스레드 안전하게 읽기만 한다). 시험에서 DTO를 JSON으로 만들 때도 쓴다.
+    public static let decoder: JSONDecoder = makeDecoder()
+
     public static func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .custom { keys in
@@ -135,7 +138,7 @@ public enum PonduJSON {
 
     // MARK: 내부
 
-    private static let categoryRawValues = Set(Category.allCases.map(\.rawValue))
+    private static let categoryRawValues = Set(ActivityCategory.allCases.map(\.rawValue))
 
     private struct AnyKey: CodingKey {
         var stringValue: String
