@@ -45,7 +45,7 @@ final class SessionControllerTests: XCTestCase {
                                  now: { c.date }, uptime: { c.uptime }, sleeper: { _ in await Task.yield() })
     }
 
-    private func startRequest(category: Category? = nil) -> StartSessionRequest {
+    private func startRequest(category: ActivityCategory? = nil) -> StartSessionRequest {
         StartSessionRequest(category: category, threadID: nil, todoID: nil, planBlockID: nil, title: "개인 제목", joinedSessionID: nil, joinedWithName: nil)
     }
 

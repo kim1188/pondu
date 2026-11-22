@@ -22,13 +22,20 @@ final class RecordModel {
     @ObservationIgnored private var inFlight = false
 
     init(backend: Backend, cache: RecordCaching = FileRecordCache(), now: @escaping @Sendable () -> Date = { Date() },
-         calendar: Calendar = .current) {
+         calendar: Calendar = RecordModel.seoulCalendar) {
         self.backend = backend
         self.cache = cache
         self.now = now
         self.calendar = calendar
-        self.timeZoneID = calendar.timeZone.identifier
+        self.timeZoneID = "Asia/Seoul"   // 서버는 p_tz로 Asia/Seoul만 받는다
         self.sessions = SessionListModel(backend: backend)
+    }
+
+    /// 날짜 경계는 항상 Asia/Seoul(애드엔덤 R11).
+    static var seoulCalendar: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .current
+        return c
     }
 
     private var userKey: String { backend.currentUserID?.uuidString.lowercased() ?? "anonymous" }

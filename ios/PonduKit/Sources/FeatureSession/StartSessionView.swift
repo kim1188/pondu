@@ -98,6 +98,6 @@ struct StartSessionView: View {
 }
 
 enum CategoryStyle {
-    static func name(_ raw: String) -> String { Category(rawValue: raw)?.displayName ?? raw }
-    static func color(_ raw: String) -> Color { Category(rawValue: raw)?.color ?? .gray }
+    static func name(_ raw: String) -> String { ActivityCategory(serverKey: raw)?.displayName ?? raw }
+    static func color(_ raw: String) -> Color { ActivityCategory(serverKey: raw)?.color ?? .gray }
 }
