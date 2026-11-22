@@ -32,7 +32,7 @@ final class RecordModel {
     }
 
     /// 날짜 경계는 항상 Asia/Seoul(애드엔덤 R11).
-    static var seoulCalendar: Calendar {
+    nonisolated static var seoulCalendar: Calendar {
         var c = Calendar(identifier: .gregorian)
         c.timeZone = TimeZone(identifier: "Asia/Seoul") ?? .current
         return c

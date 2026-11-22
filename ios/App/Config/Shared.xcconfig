@@ -1,5 +1,6 @@
 // 빌드 설정 공통. 프로젝트 주소와 공개용 키는 Secrets.xcconfig에서 온다(없으면 빈 값).
 // Secrets.example.xcconfig를 복사해 Secrets.xcconfig를 만든다.
+ALWAYS_SEARCH_USER_PATHS = NO
 SUPABASE_URL =
 SUPABASE_ANON_KEY =
 #include? "Secrets.xcconfig"
