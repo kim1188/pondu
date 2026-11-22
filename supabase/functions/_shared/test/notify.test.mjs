@@ -21,7 +21,7 @@ test('공급자 토큰: ES256 JWT, 서명이 공개키로 검증된다', async (
 });
 
 test('알림 문구: 이름만 쓰고 한마디 본문·세션 제목은 싣지 않는다', () => {
-  const p = buildPush({ kind: 'comment', actor_name: '가은', payload: { actor_id: 'x', session_id: 's1', body: '비밀 한마디', share_title: '비밀 제목' } });
+  const p = buildPush({ kind: 'comment', actor_name: '가은', payload: { user_id: 'x', session_id: 's1', comment_id: 'c1', body: '비밀 한마디', share_title: '비밀 제목' } });
   assert.equal(p.aps.alert.body, '가은님이 한마디를 남겼어요');
   assert.equal(p.session_id, 's1');
   assert.equal(JSON.stringify(p).includes('비밀'), false);

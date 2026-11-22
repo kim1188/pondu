@@ -10,8 +10,8 @@ begin
   insert into device_tokens (user_id, token) values (a, 'tok-a1'), (a, 'tok-a2');
 
   insert into notification_outbox (user_id, kind, payload) values
-    (a, 'reaction', jsonb_build_object('actor_id', b::text, 'session_id', gen_random_uuid()::text)),
-    (b, 'friend_request', jsonb_build_object('actor_id', a::text));
+    (a, 'reaction', jsonb_build_object('user_id', b::text, 'session_id', gen_random_uuid()::text)),
+    (b, 'friend_request', jsonb_build_object('user_id', a::text));
   insert into notification_outbox (user_id, kind, payload, created_at) values (a, 'comment', '{}', now() - interval '25 hours');
 
   r := notification_outbox_claim(10);
@@ -36,4 +36,14 @@ begin
   assert device_tokens_remove(array['tok-a1', 'nope']) = 1, '토큰 삭제 수가 틀림';
   select count(*) into n from device_tokens where user_id = a;
   assert n = 1, '토큰이 남아 있어야 함';
+
+  -- 차단: 어느 방향이든 차단 관계면 집는 순간 보내지 않고 발송 처리한다.
+  insert into blocks (blocker_id, blocked_id) values (b, a);
+  insert into notification_outbox (user_id, kind, payload) values (a, 'reaction', jsonb_build_object('user_id', b::text));  -- a가 받음, 행위자 b는 a를 차단
+  insert into notification_outbox (user_id, kind, payload) values (b, 'comment', jsonb_build_object('user_id', a::text));   -- b가 받음, 행위자 a는 b에게 차단당함
+  r := notification_outbox_claim(10);
+  assert r = '[]'::jsonb, format('차단 관계 알림이 나감: %s', r);
+  select count(*) into n from notification_outbox where sent_at is not null and created_at > now() - interval '1 minute'
+     and kind in ('reaction','comment') and claimed_at is not null;
+  assert n >= 2, format('차단 알림이 발송 처리되지 않음: %s', n);
 end $$;

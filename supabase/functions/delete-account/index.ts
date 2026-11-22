@@ -14,6 +14,20 @@ Deno.serve(async (req: Request) => {
       deps: {
         db: makeDb(admin),
         storage: {
+          // prefix 아래를 폴더째 재귀로 나열한다(폴더 항목은 id가 없다).
+          listAll: async (bucket: string, prefix: string) => {
+            const out: string[] = [];
+            const walk = async (dir: string) => {
+              for (let offset = 0; ; offset += 100) {
+                const { data, error } = await admin.storage.from(bucket).list(dir.replace(/\/$/, ''), { limit: 100, offset });
+                if (error) throw error;
+                for (const e of data ?? []) (e.id ? out.push(dir + e.name) : await walk(`${dir}${e.name}/`));
+                if (!data || data.length < 100) break;
+              }
+            };
+            await walk(prefix);
+            return out;
+          },
           remove: async (bucket: string, paths: string[]) => {
             const { error } = await admin.storage.from(bucket).remove(paths);
             if (error) throw error;
