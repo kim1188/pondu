@@ -109,7 +109,7 @@ begin
            least(p_end, (g::date + 1)::timestamp at time zone p_tz) as e
     from generate_series((p_start at time zone p_tz)::date, (p_end at time zone p_tz)::date, interval '1 day') g
   ), w as (
-    select d.day, greatest(extract(epoch from d.e - d.s), 0) as ov from d
+    select d.day, extract(epoch from d.e - d.s) as ov from d where d.e > d.s
   ), c as (
     select w.day, sum(w.ov) over (order by w.day) as cum, sum(w.ov) over () as tot from w
   )
