@@ -1,0 +1,20 @@
+{
+  "flow": "assistant",
+  "metrics": [
+    { "id": "pass", "label": "통과", "kind": "binary" },
+    { "id": "rules_ok", "label": "규칙 위반 없음", "kind": "binary" },
+    { "id": "expect_ok", "label": "기대 충족", "kind": "binary" },
+    { "id": "no_invented_due", "label": "기한 안 지어냄", "kind": "binary" },
+    { "id": "no_false_done", "label": "거짓 완료 없음", "kind": "binary" }
+  ],
+  "perf_fields": ["latency_s", "refused"],
+  "harness_paths": [
+    "assistant/core/propose.mjs",
+    "assistant/core/prompt.mjs",
+    "assistant/core/schema.mjs",
+    "assistant/core/validate.mjs",
+    "assistant/core/time.mjs",
+    "assistant/eval/cases.mjs",
+    "assistant/eval/grade.mjs"
+  ]
+}
