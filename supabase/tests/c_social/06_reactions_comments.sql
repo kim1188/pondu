@@ -56,6 +56,9 @@ begin
   assert n = 0, '남에게 알림이 새지 않음';
 
   -- 목록: 볼 수 있는 사람만, 오래된 순
+  reset role;   -- 한 트랜잭션이라 시각이 같으니 순서를 명시
+  update comments set created_at = now() - interval '2 minutes' where id = (c1 ->> 'id')::uuid;
+  update comments set created_at = now() - interval '1 minute' where id = (c2 ->> 'id')::uuid;
   perform test_login(fr);
   r := list_comments(pub);
   assert jsonb_array_length(r) = 2 and r -> 0 ->> 'body' = '좋아요', '한마디 목록';
