@@ -82,7 +82,7 @@ export const CASES = [
     { todos: [1, 1], titles: [['ML', 'hw3', '머신러닝']], due: [{ match: ['ML', 'hw3', '머신러닝'], dates: [D.thu] }] },
     P({ todos: [T('ML hw3', D.thu)] })),
   mk('c17', 'capture', 'multi', { text: '금요일까지 발표 자료 준비하고, 내일은 관련 논문 두 개 먼저 봐야 해' },
-    { todos: [2, 3], titles: [['발표'], ['논문']], due: [{ match: ['발표'], dates: [D.fri] }, { match: ['논문'], dates: [null, D.tue] }] },
+    { todos: [2, 3], titles: [['발표'], ['논문']], due: [{ match: ['논문'], dates: [null, D.tue] }, { match: ['발표'], dates: [D.fri] }] },   // 더 구체적인 '논문'을 먼저 본다(제목에 '발표 관련 논문'처럼 둘 다 들어갈 수 있다)
     P({ todos: [T('발표 자료 준비', D.fri), T('관련 논문 두 개 읽기', D.tue)] })),
   mk('c18', 'capture', 'pasted', {
     text: '이거 투두 앱에서 복사한 거야. 옮겨줘',

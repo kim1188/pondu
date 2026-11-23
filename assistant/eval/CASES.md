@@ -22,7 +22,7 @@
 | c14 | capture | event | 목요일 오후 3시에 팀플 회의 있어 | `{"todos":[0,1],"due_allowed":[null,"2026-11-26"]}` |
 | c15 | capture | dedupe | DB 과제 해야 함 | `{"todos":[0,0],"done":[]}` |
 | c16 | capture | english | need to finish ML hw3 by Thu | `{"todos":[1,1],"titles":[["ML","hw3","머신러닝"]],"due":[{"match":["ML","hw3","머신러닝"],"dates":["2026-11-26"]}]}` |
-| c17 | capture | multi | 금요일까지 발표 자료 준비하고, 내일은 관련 논문 두 개 먼저 봐야 해 | `{"todos":[2,3],"titles":[["발표"],["논문"]],"due":[{"match":["발표"],"dates":["2026-11-27"]},{"match":["논문"],"dates":[null,"2026-11-24"]}]}` |
+| c17 | capture | multi | 금요일까지 발표 자료 준비하고, 내일은 관련 논문 두 개 먼저 봐야 해 | `{"todos":[2,3],"titles":[["발표"],["논문"]],"due":[{"match":["논문"],"dates":[null,"2026-11-24"]},{"match":["발표"],"dates":["2026-11-27"]}]}` |
 | c18 | capture | pasted | 이거 투두 앱에서 복사한 거야. 옮겨줘 | `{"todos":[2,3],"titles":[["컴구"],["회비","정산"]],"due":[{"match":["회비","정산"],"dates":["2026-11-25"]}],"done":[]}` |
 | c19 | capture | date | 오늘 밤 11시 59분까지 운영체제 퀴즈 제출해야 해 | `{"todos":[1,1],"titles":[["운영체제","퀴즈"]],"due":[{"match":["운영체제","퀴즈"],"dates":["2026-11-23"],"times":["23:59"]}]}` |
 | c20 | capture | done | DB 과제는 이미 냈고, 이제 네트워크 과제만 하면 돼 | `{"todos":[1,1],"titles":[["네트워크"]],"forbid_titles":[["DB"]],"done":["t1"]}` |
@@ -1039,19 +1039,19 @@
  "due": [
   {
    "match": [
-    "발표"
-   ],
-   "dates": [
-    "2026-11-27"
-   ]
-  },
-  {
-   "match": [
     "논문"
    ],
    "dates": [
     null,
     "2026-11-24"
+   ]
+  },
+  {
+   "match": [
+    "발표"
+   ],
+   "dates": [
+    "2026-11-27"
    ]
   }
  ]
