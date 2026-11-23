@@ -14,3 +14,7 @@
 | [AGENTS.md](AGENTS.md) | 이 저장소에서 일하는 에이전트와 사람의 규칙 |
 | [PROGRESS.md](PROGRESS.md) | 무엇이 어떤 수준으로 확인됐는지 |
 | [docs/HANDOFF.md](docs/HANDOFF.md) | Mac·Supabase·API 키가 필요한 작업의 인계 안내 |
+
+## 화면 흐름 보기
+
+`design/pondu.html`을 브라우저에서 열면 앱 전체 화면과 이동 경로를 눌러 볼 수 있다. 설명은 `design/README.md`.

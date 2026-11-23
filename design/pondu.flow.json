@@ -1,0 +1,2180 @@
+{
+ "id": "pondu-app",
+ "title": "Pondu",
+ "goal": "오늘 할 일을 정리하고, 실제로 한 시간을 세션으로 남겨 친구와 나눈다.",
+ "device": "mobile",
+ "start": "email",
+ "entries": [
+  "today",
+  "together",
+  "record",
+  "plan-input",
+  "session-start"
+ ],
+ "source": "docs/PRD.md v0.4, docs/specs/CONTRACT-ADDENDUM.md 보정 3, ios/PonduKit 화면 구현",
+ "stages": [
+  "가입",
+  "오늘",
+  "비서",
+  "세션",
+  "함께",
+  "기록"
+ ],
+ "vars": {
+  "email": "",
+  "otp": "",
+  "resent": 0,
+  "name": "",
+  "major": "인공지능학과",
+  "calendar": "연결 안 됨",
+  "consented": false,
+  "planText": "",
+  "ask": "묻는 중",
+  "est": "30분",
+  "fit": "미정",
+  "manualTitle": "",
+  "captureText": "",
+  "pasted": "",
+  "sessionTitle": "DB 과제",
+  "together": "혼자",
+  "visibility": "친구",
+  "crew": "DB 스터디",
+  "photo": "사진 없는 기록",
+  "memo": "",
+  "outcome": "없음",
+  "cheers": 0,
+  "lastComment": "없음",
+  "commentText": "",
+  "handle": "",
+  "requests": 0,
+  "corrected": "없음",
+  "endTime": "16:20"
+ },
+ "screens": [
+  {
+   "id": "email",
+   "number": "01.01",
+   "title": "학교 메일 입력",
+   "stage": 0,
+   "origin": "source",
+   "brief": "고려대 메일(@korea.ac.kr)로만 가입한다. 메일로 6자리 코드를 보낸다.",
+   "actions": [
+    {
+     "id": "send-code",
+     "label": "코드 받기",
+     "to": "code",
+     "validate": true
+    },
+    {
+     "id": "wrong-domain",
+     "label": "다른 학교·일반 메일을 넣음",
+     "to": "email-error",
+     "kind": "simulation"
+    }
+   ],
+   "ui": {
+    "heading": "학교 메일로 시작해요",
+    "blocks": [
+     {
+      "type": "input",
+      "label": "학교 메일",
+      "field": "email",
+      "inputType": "email",
+      "required": true
+     },
+     {
+      "type": "text",
+      "label": "@korea.ac.kr 메일만 쓸 수 있어요."
+     }
+    ]
+   },
+   "uxConditions": [
+    "도메인 검사는 서버가 한다. 앱에서 막아도 서버가 다시 거절한다.",
+    "메일 주소는 다른 사용자에게 보이지 않는다."
+   ]
+  },
+  {
+   "id": "email-error",
+   "number": "01.02",
+   "title": "학교 메일이 아님",
+   "stage": 0,
+   "origin": "source",
+   "brief": "학교 메일이 아니면 가입할 수 없다고 알리고 다시 입력하게 한다.",
+   "actions": [
+    {
+     "id": "retry-email",
+     "label": "메일 다시 입력",
+     "to": "email"
+    }
+   ],
+   "tone": "error",
+   "body": "고려대 메일(@korea.ac.kr)만 가입할 수 있어요.",
+   "preview": {
+    "email": "me@gmail.com"
+   },
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "입력한 메일",
+        "value": "{{email}}"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "code",
+   "number": "01.03",
+   "title": "6자리 코드 입력",
+   "stage": 0,
+   "origin": "source",
+   "brief": "메일로 받은 6자리 코드를 입력해 로그인한다.",
+   "actions": [
+    {
+     "id": "verify",
+     "label": "확인",
+     "to": "profile",
+     "validate": true
+    },
+    {
+     "id": "back-email",
+     "label": "메일 다시 입력",
+     "to": "email",
+     "kind": "back"
+    },
+    {
+     "id": "resend",
+     "label": "코드 다시 받기",
+     "to": "code",
+     "kind": "secondary",
+     "inc": {
+      "resent": 1
+     }
+    }
+   ],
+   "ui": {
+    "heading": "메일로 보낸 코드를 입력해요",
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "보낸 곳",
+        "value": "{{email}}"
+       },
+       {
+        "label": "다시 보낸 횟수",
+        "value": "{{resent}}회"
+       }
+      ]
+     },
+     {
+      "type": "input",
+      "label": "6자리 코드",
+      "field": "otp",
+      "required": true
+     }
+    ]
+   },
+   "uxConditions": [
+    "코드가 틀리거나 만료되면 같은 화면에서 안내하고 다시 받게 한다(더미에서는 생략)."
+   ]
+  },
+  {
+   "id": "profile",
+   "number": "01.04",
+   "title": "프로필 만들기",
+   "stage": 0,
+   "origin": "source",
+   "brief": "이름과 학과를 정한다. 학과는 공식 목록 65개에서 고른다.",
+   "actions": [
+    {
+     "id": "save-profile",
+     "label": "다음",
+     "to": "calendar",
+     "validate": true
+    }
+   ],
+   "ui": {
+    "heading": "어떻게 불러 드릴까요?",
+    "blocks": [
+     {
+      "type": "input",
+      "label": "이름",
+      "field": "name",
+      "required": true
+     },
+     {
+      "type": "select",
+      "label": "학과",
+      "field": "major",
+      "options": [
+       "인공지능학과",
+       "컴퓨터학과",
+       "데이터과학과",
+       "경영학과"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "calendar",
+   "number": "01.05",
+   "title": "캘린더 읽기 허용",
+   "stage": 0,
+   "origin": "source",
+   "brief": "iPhone 캘린더 권한을 요청하고 읽을 캘린더를 고른다. 일정 제목은 기기 밖으로 나가지 않는다.",
+   "actions": [
+    {
+     "id": "allow-cal",
+     "label": "캘린더 연결",
+     "to": "today",
+     "set": {
+      "calendar": "연결됨"
+     }
+    },
+    {
+     "id": "skip-cal",
+     "label": "나중에",
+     "to": "today",
+     "kind": "secondary"
+    }
+   ],
+   "body": "수업과 약속 시간을 피해 계획을 잡아요. 비서에게는 바쁜 시간의 시작과 끝만 보내요.",
+   "uxConditions": [
+    "허용하지 않아도 앱을 쓸 수 있다. 그때는 바쁜 시간 없이 계획한다."
+   ]
+  },
+  {
+   "id": "today",
+   "number": "02.01",
+   "title": "오늘",
+   "stage": 1,
+   "origin": "source",
+   "brief": "오늘의 고정 일정, 지금 시작할 수 있는 일, 남은 할 일, 비서 진입점을 한 화면에 둔다.",
+   "actions": [
+    {
+     "id": "start-now",
+     "label": "지금 시작 · DB 과제",
+     "to": "session-start",
+     "set": {
+      "sessionTitle": "DB 과제",
+      "together": "혼자"
+     }
+    },
+    {
+     "id": "plan-day",
+     "label": "하루 정리",
+     "to": "consent",
+     "kind": "inline"
+    },
+    {
+     "id": "reschedule",
+     "label": "남은 일 조정",
+     "to": "reschedule",
+     "kind": "inline"
+    },
+    {
+     "id": "capture",
+     "label": "한 줄 입력",
+     "to": "capture",
+     "kind": "inline"
+    },
+    {
+     "id": "import",
+     "label": "가져오기",
+     "to": "import",
+     "kind": "inline"
+    },
+    {
+     "id": "free-start",
+     "label": "할 일 없이 바로 시작",
+     "to": "session-start",
+     "kind": "secondary",
+     "set": {
+      "sessionTitle": "자유 기록",
+      "together": "혼자"
+     }
+    },
+    {
+     "id": "no-todos",
+     "label": "할 일이 하나도 없음",
+     "to": "today-empty",
+     "kind": "simulation"
+    },
+    {
+     "id": "tab-together",
+     "label": "함께",
+     "to": "together",
+     "kind": "tab"
+    },
+    {
+     "id": "tab-record",
+     "label": "기록",
+     "to": "record",
+     "kind": "tab"
+    }
+   ],
+   "ui": {
+    "bar": "오늘",
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "10:30~12:00",
+        "value": "자료구조 (캘린더)"
+       },
+       {
+        "label": "지금 할 수 있는 일",
+        "value": "DB 과제 · 60분"
+       },
+       {
+        "label": "남은 할 일",
+        "value": "영어 단어 · 앱 로그인 수정"
+       },
+       {
+        "label": "캘린더",
+        "value": "{{calendar}}"
+       }
+      ]
+     }
+    ]
+   },
+   "uxConditions": [
+    "알림을 받았거나 예정 시각이 돼도 세션이 저절로 시작되지 않는다.",
+    "친구가 없어도 오늘과 기록만으로 쓸 수 있어야 한다."
+   ]
+  },
+  {
+   "id": "today-empty",
+   "number": "02.02",
+   "title": "오늘 · 할 일 없음",
+   "stage": 1,
+   "origin": "inferred",
+   "brief": "할 일이 없어도 기록을 시작하거나 할 일을 넣을 길을 보여 준다.",
+   "actions": [
+    {
+     "id": "free-start-empty",
+     "label": "바로 시작",
+     "to": "session-start",
+     "set": {
+      "sessionTitle": "자유 기록",
+      "together": "혼자"
+     }
+    },
+    {
+     "id": "capture-empty",
+     "label": "할 일 적기",
+     "to": "capture",
+     "kind": "secondary"
+    },
+    {
+     "id": "import-empty",
+     "label": "가져오기",
+     "to": "import",
+     "kind": "secondary"
+    }
+   ],
+   "body": "아직 할 일이 없어요. 바로 기록을 시작하거나 할 일을 적어 보세요."
+  },
+  {
+   "id": "import",
+   "number": "02.03",
+   "title": "가져오기 · 붙여 넣기",
+   "stage": 1,
+   "origin": "source",
+   "brief": "투두 앱이나 시간표의 글을 붙여 넣으면 후보 항목을 뽑는다.",
+   "actions": [
+    {
+     "id": "extract",
+     "label": "항목 찾기",
+     "to": "import-review",
+     "validate": true
+    },
+    {
+     "id": "back-import",
+     "label": "오늘",
+     "to": "today",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "input",
+      "label": "붙여 넣은 글",
+      "field": "pasted",
+      "inputType": "textarea",
+      "required": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "import-review",
+   "number": "02.04",
+   "title": "가져오기 · 확인",
+   "stage": 1,
+   "origin": "source",
+   "brief": "뽑은 후보를 보여 주고 애매한 항목을 표시한다. 확인한 것만 저장한다.",
+   "actions": [
+    {
+     "id": "save-import",
+     "label": "고른 것만 저장",
+     "to": "today"
+    },
+    {
+     "id": "back-review",
+     "label": "다시 붙여 넣기",
+     "to": "import",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "선형대수 과제",
+        "value": "금요일까지"
+       },
+       {
+        "label": "알고리즘 복습",
+        "value": "기한 없음"
+       },
+       {
+        "label": "스터디 (애매함)",
+        "value": "날짜를 확인해 주세요"
+       }
+      ]
+     },
+     {
+      "type": "notice",
+      "label": "애매한 항목은 꺼 둔 채로 보여 줘요."
+     }
+    ]
+   }
+  },
+  {
+   "id": "consent",
+   "number": "03.01",
+   "title": "비서 사용 동의",
+   "stage": 2,
+   "origin": "source",
+   "brief": "첫 사용 전에 무엇이 서버와 AI로 가는지 알리고 동의를 받는다.",
+   "actions": [
+    {
+     "id": "agree",
+     "label": "동의하고 시작",
+     "to": "plan-input",
+     "set": {
+      "consented": true
+     }
+    },
+    {
+     "id": "decline",
+     "label": "취소",
+     "to": "today",
+     "kind": "secondary"
+    }
+   ],
+   "ui": {
+    "heading": "비서를 쓰기 전에",
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "보내는 것",
+        "value": "입력한 문장"
+       },
+       {
+        "label": "보내는 것",
+        "value": "열린 할 일의 제목"
+       },
+       {
+        "label": "보내는 것",
+        "value": "바쁜 시간의 시작과 끝"
+       }
+      ]
+     },
+     {
+      "type": "notice",
+      "label": "캘린더 일정의 제목과 메모는 기기 밖으로 나가지 않아요."
+     }
+    ]
+   },
+   "uxConditions": [
+    "한 번 동의하면 다시 묻지 않는다(더미에서는 매번 보인다)."
+   ]
+  },
+  {
+   "id": "plan-input",
+   "number": "03.02",
+   "title": "하루 정리 · 입력",
+   "stage": 2,
+   "origin": "source",
+   "brief": "오늘 하고 싶은 일을 문장으로 적으면 비서가 바쁜 시간을 피해 초안을 만든다.",
+   "actions": [
+    {
+     "id": "ask",
+     "label": "비서에게 보내기",
+     "to": "proposal",
+     "set": {
+      "ask": "묻는 중",
+      "est": "30분",
+      "fit": "미정"
+     }
+    },
+    {
+     "id": "fail",
+     "label": "비서 응답 실패(20초 초과)",
+     "to": "assistant-failed",
+     "kind": "simulation"
+    },
+    {
+     "id": "close-plan",
+     "label": "닫기",
+     "to": "today",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "input",
+      "label": "오늘 하고 싶은 일(선택)",
+      "field": "planText",
+      "inputType": "textarea"
+     },
+     {
+      "type": "notice",
+      "label": "비서가 만든 것은 초안이에요. 적용하기 전에는 아무것도 저장되지 않아요."
+     }
+    ]
+   }
+  },
+  {
+   "id": "proposal",
+   "number": "03.03",
+   "title": "비서 초안",
+   "stage": 2,
+   "origin": "source",
+   "brief": "초안을 보여 주고 전부 또는 일부만 적용하게 한다. 예상 시간이 없는 일은 30분으로 잡고 2분 동안 묻는다. 다 들어가지 않는 일은 가용 시간과 선택지를 보여 준다.",
+   "actions": [
+    {
+     "id": "apply",
+     "label": "전부 적용",
+     "to": "applied",
+     "kind": "primary"
+    },
+    {
+     "id": "est-60",
+     "label": "영어 단어 · 1시간 걸려요",
+     "to": "proposal",
+     "kind": "inline",
+     "when": {
+      "ask": "묻는 중"
+     },
+     "set": {
+      "est": "60분",
+      "ask": "답함"
+     }
+    },
+    {
+     "id": "est-skip",
+     "label": "영어 단어 · 건너뛰기",
+     "to": "proposal",
+     "kind": "inline",
+     "when": {
+      "ask": "묻는 중"
+     },
+     "set": {
+      "ask": "건너뜀"
+     }
+    },
+    {
+     "id": "est-timeout",
+     "label": "2분 동안 답이 없음",
+     "to": "proposal",
+     "kind": "simulation",
+     "when": {
+      "ask": "묻는 중"
+     },
+     "set": {
+      "ask": "시간 지남"
+     }
+    },
+    {
+     "id": "fit-partial",
+     "label": "DB 과제 · 오늘 21:30~23:00에 1시간 30분만",
+     "to": "proposal",
+     "kind": "inline",
+     "when": {
+      "fit": "미정"
+     },
+     "set": {
+      "fit": "오늘 1시간 30분만"
+     }
+    },
+    {
+     "id": "fit-later",
+     "label": "DB 과제 · 11월 24일 08:00~11:00로 옮기기",
+     "to": "proposal",
+     "kind": "inline",
+     "when": {
+      "fit": "미정"
+     },
+     "set": {
+      "fit": "내일 08:00로 옮김"
+     }
+    },
+    {
+     "id": "fit-skip",
+     "label": "DB 과제 · 이번엔 건너뛰기",
+     "to": "proposal",
+     "kind": "inline",
+     "when": {
+      "fit": "미정"
+     },
+     "set": {
+      "fit": "건너뜀"
+     }
+    },
+    {
+     "id": "discard",
+     "label": "적용하지 않고 닫기",
+     "to": "today",
+     "kind": "secondary"
+    }
+   ],
+   "preview": {
+    "ask": "묻는 중",
+    "est": "30분",
+    "fit": "미정"
+   },
+   "ui": {
+    "bar": "하루 정리",
+    "blocks": [
+     {
+      "type": "text",
+      "label": "오늘은 세 가지를 잡아 봤어요."
+     },
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "15:00~16:00",
+        "value": "앱 로그인 수정 · 60분"
+       },
+       {
+        "label": "21:00~",
+        "value": "영어 단어 · {{est}}"
+       },
+       {
+        "label": "예상 시간 묻기",
+        "value": "{{ask}}"
+       }
+      ]
+     },
+     {
+      "type": "notice",
+      "label": "‘영어 단어’ 얼마나 걸릴까요? 일단 30분으로 잡아 뒀어요. 2분 안에 답이 없으면 그대로 둘게요."
+     },
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "시간을 못 잡았어요",
+        "value": "DB 과제 · 3시간 필요"
+       },
+       {
+        "label": "오늘 한 번에 쓸 수 있는 시간",
+        "value": "1시간 30분"
+       },
+       {
+        "label": "오늘 남은 빈 시간",
+        "value": "모두 1시간 30분"
+       },
+       {
+        "label": "DB 과제를 어떻게 할까요",
+        "value": "{{fit}}"
+       }
+      ]
+     }
+    ]
+   },
+   "uxConditions": [
+    "예상 시간이 없는 일: 30분으로 먼저 잡는다. 답하면 그 길이로 바꾸고, 건너뛰거나 2분이 지나면 30분 그대로 둔다.",
+    "답한 길이가 들어갈 자리가 없으면 그 일은 ‘시간을 못 잡았어요’로 옮겨 간다.",
+    "한 가지 일은 통째로 잡는다. 다 들어가지 않으면 가용 시간을 보여 주고 일부만·다른 날·건너뛰기 중에 고르게 한다.",
+    "묻는 중에 앱을 떠나면 알림이 한 번 간다. 답은 앱 안에서 고른다.",
+    "비서는 말하지 않은 마감이나 목표를 만들지 않는다."
+   ]
+  },
+  {
+   "id": "applied",
+   "number": "03.04",
+   "title": "적용 완료",
+   "stage": 2,
+   "origin": "source",
+   "brief": "적용한 계획이 오늘 화면에 들어가고 예정 시각에 로컬 알림이 잡힌다.",
+   "actions": [
+    {
+     "id": "done-applied",
+     "label": "닫기",
+     "to": "today"
+    }
+   ],
+   "tone": "success",
+   "end": true,
+   "body": "적용했어요. 영어 단어 {{est}}, DB 과제는 ‘{{fit}}’.",
+   "preview": {
+    "est": "30분",
+    "fit": "미정"
+   }
+  },
+  {
+   "id": "assistant-failed",
+   "number": "03.05",
+   "title": "비서 실패 · 직접 입력",
+   "stage": 2,
+   "origin": "source",
+   "brief": "비서가 실패하거나 늦으면 직접 입력으로 넘어간다.",
+   "actions": [
+    {
+     "id": "manual-add",
+     "label": "할 일로 추가",
+     "to": "today",
+     "validate": true
+    },
+    {
+     "id": "retry-ask",
+     "label": "다시 시도",
+     "to": "plan-input",
+     "kind": "secondary"
+    }
+   ],
+   "tone": "error",
+   "ui": {
+    "blocks": [
+     {
+      "type": "notice",
+      "label": "비서 응답이 늦어요. 직접 입력해 주세요."
+     },
+     {
+      "type": "input",
+      "label": "할 일",
+      "field": "manualTitle",
+      "required": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "capture",
+   "number": "03.06",
+   "title": "한 줄 입력",
+   "stage": 2,
+   "origin": "source",
+   "brief": "한 문장을 할 일 후보로 정리한다(제목, 기한, 예상 시간). 시간은 잡지 않는다.",
+   "actions": [
+    {
+     "id": "send-capture",
+     "label": "정리하기",
+     "to": "capture-proposal",
+     "validate": true
+    },
+    {
+     "id": "close-capture",
+     "label": "닫기",
+     "to": "today",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "input",
+      "label": "해야 할 일",
+      "field": "captureText",
+      "required": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "capture-proposal",
+   "number": "03.07",
+   "title": "한 줄 입력 · 초안",
+   "stage": 2,
+   "origin": "source",
+   "brief": "정리한 할 일 후보를 보여 주고 적용하게 한다. 말하지 않은 기한은 비워 둔다.",
+   "actions": [
+    {
+     "id": "apply-capture",
+     "label": "전부 적용",
+     "to": "applied"
+    },
+    {
+     "id": "discard-capture",
+     "label": "적용하지 않고 닫기",
+     "to": "today",
+     "kind": "secondary"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "입력",
+        "value": "{{captureText}}"
+       },
+       {
+        "label": "새 할 일",
+        "value": "발표 자료 준비 · 금요일 마감"
+       },
+       {
+        "label": "예상 시간",
+        "value": "말하지 않아 비워 둠"
+       }
+      ]
+     }
+    ]
+   },
+   "preview": {
+    "captureText": "금요일까지 발표 자료 준비"
+   }
+  },
+  {
+   "id": "reschedule",
+   "number": "03.08",
+   "title": "남은 일 조정",
+   "stage": 2,
+   "origin": "source",
+   "brief": "못 끝냈거나 놓친 일을 남은 시간에 다시 배치하는 안을 만든다. 세션을 ‘더 해야 해요’로 끝낸 뒤에도 온다.",
+   "actions": [
+    {
+     "id": "apply-reschedule",
+     "label": "전부 적용",
+     "to": "applied"
+    },
+    {
+     "id": "discard-reschedule",
+     "label": "적용하지 않고 닫기",
+     "to": "today",
+     "kind": "secondary"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "세션 결과",
+        "value": "{{outcome}}"
+       },
+       {
+        "label": "이어 할 시간",
+        "value": "DB 과제 · 20:00~21:00"
+       },
+       {
+        "label": "놓친 일",
+        "value": "알고리즘 복습 · 내일 09:00~10:00"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "session-start",
+   "number": "04.01",
+   "title": "세션 시작",
+   "stage": 3,
+   "origin": "source",
+   "brief": "제목, 분야, 연결된 할 일은 이미 채워져 있다. 공개 대상은 이어가는 일의 기본값을 따르고 그 자리에서 바꿀 수 있다.",
+   "actions": [
+    {
+     "id": "take-photo",
+     "label": "사진 찍고 시작",
+     "to": "camera"
+    },
+    {
+     "id": "start-plain",
+     "label": "사진 없이 시작",
+     "to": "live",
+     "kind": "secondary",
+     "set": {
+      "photo": "사진 없는 기록"
+     }
+    },
+    {
+     "id": "cancel-start",
+     "label": "취소",
+     "to": "today",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "제목",
+        "value": "{{sessionTitle}}"
+       },
+       {
+        "label": "분야",
+        "value": "공부·코딩"
+       },
+       {
+        "label": "함께",
+        "value": "{{together}}"
+       }
+      ]
+     },
+     {
+      "type": "radio",
+      "label": "공개 대상",
+      "field": "visibility",
+      "options": [
+       "나만",
+       "친구",
+       "크루"
+      ]
+     },
+     {
+      "type": "select",
+      "label": "크루(공개 대상이 크루일 때)",
+      "field": "crew",
+      "options": [
+       "DB 스터디",
+       "러닝 크루"
+      ]
+     }
+    ]
+   },
+   "preview": {
+    "sessionTitle": "DB 과제",
+    "together": "혼자"
+   },
+   "uxConditions": [
+    "크루를 고르면 어느 크루에 보일지 세션마다 고른다.",
+    "사진은 앱 안 카메라로만 찍는다. 앨범에서 고를 수 없다."
+   ]
+  },
+  {
+   "id": "camera",
+   "number": "04.02",
+   "title": "앱 안 카메라",
+   "stage": 3,
+   "origin": "source",
+   "brief": "앱 안 카메라로 지금 하는 일을 찍는다. 건너뛸 수 있다.",
+   "actions": [
+    {
+     "id": "shoot",
+     "label": "촬영",
+     "to": "live",
+     "set": {
+      "photo": "앱 촬영 첨부"
+     }
+    },
+    {
+     "id": "skip-photo",
+     "label": "건너뛰기",
+     "to": "live",
+     "kind": "secondary",
+     "set": {
+      "photo": "사진 없는 기록"
+     }
+    },
+    {
+     "id": "back-camera",
+     "label": "뒤로",
+     "to": "session-start",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "visual",
+      "label": "카메라 미리보기: 책상 위 노트북과 과제",
+      "aspect": "portrait"
+     }
+    ]
+   }
+  },
+  {
+   "id": "live",
+   "number": "04.03",
+   "title": "진행 중인 세션",
+   "stage": 3,
+   "origin": "source",
+   "brief": "시작 시각부터 실제 시간이 흐른다. 시간을 손으로 고칠 수 없다.",
+   "actions": [
+    {
+     "id": "end",
+     "label": "종료하기",
+     "to": "session-end"
+    },
+    {
+     "id": "minimize",
+     "label": "오늘 화면 보기",
+     "to": "today",
+     "kind": "secondary"
+    }
+   ],
+   "tone": "pending",
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "제목",
+        "value": "{{sessionTitle}}"
+       },
+       {
+        "label": "시작",
+        "value": "15:12"
+       },
+       {
+        "label": "기록 방법",
+        "value": "{{photo}}"
+       },
+       {
+        "label": "공개 대상",
+        "value": "{{visibility}}"
+       },
+       {
+        "label": "함께",
+        "value": "{{together}}"
+       }
+      ]
+     }
+    ]
+   },
+   "preview": {
+    "sessionTitle": "DB 과제",
+    "photo": "앱 촬영 첨부",
+    "together": "혼자"
+   },
+   "uxConditions": [
+    "앱을 닫아도 세션은 이어진다. 너무 오래 열린 세션은 서버가 정리한다."
+   ]
+  },
+  {
+   "id": "session-end",
+   "number": "04.04",
+   "title": "세션 종료",
+   "stage": 3,
+   "origin": "source",
+   "brief": "끝낼 때 하나를 고른다: 끝냈어요 / 더 해야 해요 / 오늘은 여기까지. 메모는 선택.",
+   "actions": [
+    {
+     "id": "finished",
+     "label": "끝냈어요",
+     "to": "today",
+     "set": {
+      "outcome": "끝냈어요"
+     }
+    },
+    {
+     "id": "more",
+     "label": "더 해야 해요",
+     "to": "reschedule",
+     "kind": "secondary",
+     "set": {
+      "outcome": "더 해야 해요"
+     }
+    },
+    {
+     "id": "stop",
+     "label": "오늘은 여기까지",
+     "to": "today",
+     "kind": "secondary",
+     "set": {
+      "outcome": "오늘은 여기까지"
+     }
+    },
+    {
+     "id": "back-live",
+     "label": "계속하기",
+     "to": "live",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "input",
+      "label": "한 줄 메모(선택)",
+      "field": "memo"
+     }
+    ]
+   },
+   "uxConditions": [
+    "세션을 끝내도 할 일이 저절로 완료되지 않는다. ‘끝냈어요’를 골라야 완료로 바뀐다.",
+    "‘오늘은 여기까지’면 오늘은 그 일을 다시 잡지 않는다."
+   ]
+  },
+  {
+   "id": "together",
+   "number": "05.01",
+   "title": "함께",
+   "stage": 4,
+   "origin": "source",
+   "brief": "친구의 최신 세션(진행 중이 위)과 크루의 기록을 시간순으로 본다. 시간이 많은 사람을 위로 올리지 않는다.",
+   "actions": [
+    {
+     "id": "join",
+     "label": "같이 하기",
+     "to": "session-start",
+     "set": {
+      "sessionTitle": "DB 과제",
+      "together": "가온과 함께"
+     }
+    },
+    {
+     "id": "history",
+     "label": "지난 기록",
+     "to": "friend-history",
+     "kind": "inline"
+    },
+    {
+     "id": "cheer",
+     "label": "수고했어",
+     "to": "together",
+     "kind": "inline",
+     "inc": {
+      "cheers": 1
+     }
+    },
+    {
+     "id": "comment",
+     "label": "한마디",
+     "to": "comment",
+     "kind": "inline"
+    },
+    {
+     "id": "friends",
+     "label": "친구 관리",
+     "to": "friends",
+     "kind": "inline"
+    },
+    {
+     "id": "crew",
+     "label": "크루",
+     "to": "crew",
+     "kind": "inline"
+    },
+    {
+     "id": "no-friends",
+     "label": "친구가 아직 없음",
+     "to": "together-empty",
+     "kind": "simulation"
+    },
+    {
+     "id": "tab-today",
+     "label": "오늘",
+     "to": "today",
+     "kind": "tab"
+    },
+    {
+     "id": "tab-record",
+     "label": "기록",
+     "to": "record",
+     "kind": "tab"
+    }
+   ],
+   "ui": {
+    "bar": "함께",
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "가온 · DB 과제",
+        "value": "15:12에 시작 · 앱 촬영 첨부"
+       },
+       {
+        "label": "한 줄",
+        "value": "1번 문제 접근법 보는 중"
+       },
+       {
+        "label": "수고했어",
+        "value": "{{cheers}}번"
+       },
+       {
+        "label": "한마디",
+        "value": "{{lastComment}}"
+       }
+      ]
+     }
+    ]
+   },
+   "uxConditions": [
+    "개인 제목, 계획, 비서 기록은 친구에게 보이지 않는다.",
+    "같이 하기는 상대의 기록을 바꾸지 않는다. 두 카드에 서로의 이름만 붙는다."
+   ]
+  },
+  {
+   "id": "together-empty",
+   "number": "05.02",
+   "title": "함께 · 친구 없음",
+   "stage": 4,
+   "origin": "inferred",
+   "brief": "친구가 없을 때 무엇을 할 수 있는지 보여 준다.",
+   "actions": [
+    {
+     "id": "add-friend",
+     "label": "친구 찾기",
+     "to": "friends"
+    },
+    {
+     "id": "go-today",
+     "label": "오늘로",
+     "to": "today",
+     "kind": "secondary"
+    }
+   ],
+   "body": "아직 친구가 없어요. 아이디로 친구를 찾아 보세요."
+  },
+  {
+   "id": "friends",
+   "number": "05.03",
+   "title": "친구 관리",
+   "stage": 4,
+   "origin": "source",
+   "brief": "아이디로 찾아 요청을 보내고, 받은 요청을 수락하거나 거절한다.",
+   "actions": [
+    {
+     "id": "send-request",
+     "label": "요청 보내기",
+     "to": "friends",
+     "inc": {
+      "requests": 1
+     }
+    },
+    {
+     "id": "back-friends",
+     "label": "함께",
+     "to": "together",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "search",
+      "placeholder": "아이디로 찾기",
+      "field": "handle",
+      "label": "친구 찾기"
+     },
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "받은 요청",
+        "value": "다온 · 수락 / 거절"
+       },
+       {
+        "label": "보낸 요청",
+        "value": "{{requests}}건"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "comment",
+   "number": "05.04",
+   "title": "한마디 쓰기",
+   "stage": 4,
+   "origin": "source",
+   "brief": "카드에 짧은 한마디를 남긴다. 세션 주인도 남의 한마디를 지울 수 없다.",
+   "actions": [
+    {
+     "id": "post",
+     "label": "남기기",
+     "to": "together",
+     "validate": true,
+     "set": {
+      "lastComment": "남김"
+     }
+    },
+    {
+     "id": "close-comment",
+     "label": "닫기",
+     "to": "together",
+     "kind": "close"
+    }
+   ],
+   "ui": {
+    "overlay": "together",
+    "blocks": [
+     {
+      "type": "input",
+      "label": "한마디",
+      "field": "commentText",
+      "required": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "friend-history",
+   "number": "05.05",
+   "title": "친구의 지난 기록",
+   "stage": 4,
+   "origin": "source",
+   "brief": "카드에서 그 친구의 지난 세션을 연다. 공개된 것만 보인다.",
+   "actions": [
+    {
+     "id": "back-history",
+     "label": "함께",
+     "to": "together",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "어제 20:10~21:40",
+        "value": "알고리즘 복습 · 사진 없는 기록"
+       },
+       {
+        "label": "그제 14:00~15:00",
+        "value": "DB 과제 · 앱 촬영 첨부 · 나중에 정정함"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "crew",
+   "number": "05.06",
+   "title": "크루",
+   "stage": 4,
+   "origin": "source",
+   "brief": "학과 묶음 대신 직접 만든 크루의 기록을 본다.",
+   "actions": [
+    {
+     "id": "back-crew",
+     "label": "함께",
+     "to": "together",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "DB 스터디",
+        "value": "4명 · 오늘 3명이 기록"
+       },
+       {
+        "label": "러닝 크루",
+        "value": "6명 · 오늘 1명이 기록"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "record",
+   "number": "06.01",
+   "title": "기록",
+   "stage": 5,
+   "origin": "source",
+   "brief": "날짜별 기록과 잔디, 분야별 세션 시간, 이어가는 일별 이력, 완료한 할 일을 본다.",
+   "actions": [
+    {
+     "id": "open-day",
+     "label": "11월 23일 열기",
+     "to": "record-day"
+    },
+    {
+     "id": "weekly",
+     "label": "주간 돌아보기",
+     "to": "weekly",
+     "kind": "inline"
+    },
+    {
+     "id": "tab-today",
+     "label": "오늘",
+     "to": "today",
+     "kind": "tab"
+    },
+    {
+     "id": "tab-together",
+     "label": "함께",
+     "to": "together",
+     "kind": "tab"
+    }
+   ],
+   "ui": {
+    "bar": "기록",
+    "blocks": [
+     {
+      "type": "visual",
+      "label": "잔디: 기록이 남은 날을 칠한 달력",
+      "aspect": "wide"
+     },
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "공부·코딩",
+        "value": "이번 주 6시간 20분"
+       },
+       {
+        "label": "운동",
+        "value": "이번 주 2시간"
+       },
+       {
+        "label": "완료한 할 일",
+        "value": "7개"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "record-day",
+   "number": "06.02",
+   "title": "하루 기록",
+   "stage": 5,
+   "origin": "source",
+   "brief": "그날의 세션을 기록 방법 표시와 함께 본다.",
+   "actions": [
+    {
+     "id": "correct",
+     "label": "시간 정정",
+     "to": "correct"
+    },
+    {
+     "id": "back-day",
+     "label": "기록",
+     "to": "record",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "15:12~16:20",
+        "value": "DB 과제 · 앱 촬영 첨부"
+       },
+       {
+        "label": "20:00~20:40",
+        "value": "운동 · 사진 없는 기록"
+       },
+       {
+        "label": "정정 표시",
+        "value": "{{corrected}}"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "correct",
+   "number": "06.03",
+   "title": "나중에 정정",
+   "stage": 5,
+   "origin": "source",
+   "brief": "끝난 세션의 시간을 고치면 ‘나중에 정정함’이 붙고, 친구에게도 그대로 보인다.",
+   "actions": [
+    {
+     "id": "save-correct",
+     "label": "정정 저장",
+     "to": "record-day",
+     "set": {
+      "corrected": "나중에 정정함"
+     }
+    },
+    {
+     "id": "back-correct",
+     "label": "취소",
+     "to": "record-day",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "select",
+      "label": "끝난 시각",
+      "field": "endTime",
+      "options": [
+       "16:20",
+       "16:00",
+       "15:50"
+      ]
+     },
+     {
+      "type": "notice",
+      "label": "정정하면 ‘나중에 정정함’이 기록에 남아요."
+     }
+    ]
+   }
+  },
+  {
+   "id": "weekly",
+   "number": "06.04",
+   "title": "주간 돌아보기",
+   "stage": 5,
+   "origin": "source",
+   "brief": "기록에 근거한 요약만 보여 준다(P1).",
+   "actions": [
+    {
+     "id": "back-weekly",
+     "label": "기록",
+     "to": "record",
+     "kind": "back"
+    }
+   ],
+   "ui": {
+    "blocks": [
+     {
+      "type": "rows",
+      "rows": [
+       {
+        "label": "세션",
+        "value": "9번 · 8시간 20분"
+       },
+       {
+        "label": "가장 길게 한 일",
+        "value": "DB 과제"
+       },
+       {
+        "label": "예상보다 오래 걸린 분야",
+        "value": "과제 · 평소 1.4배"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "signup",
+   "title": "가입 · 학교 메일부터 오늘까지",
+   "start": "email",
+   "steps": [
+    {
+     "action": "send-code",
+     "screen": "code",
+     "hint": "학교 메일을 입력하세요."
+    },
+    {
+     "action": "verify",
+     "screen": "profile",
+     "hint": "6자리 코드를 입력하세요."
+    },
+    {
+     "action": "save-profile",
+     "screen": "calendar",
+     "hint": "이름을 입력하세요."
+    },
+    {
+     "action": "allow-cal",
+     "screen": "today",
+     "vars": {
+      "calendar": "연결됨"
+     }
+    }
+   ]
+  },
+  {
+   "id": "plan-answer",
+   "title": "하루 정리 · 예상 시간 답하고 일부만 잡기",
+   "start": "today",
+   "steps": [
+    {
+     "action": "plan-day",
+     "screen": "consent"
+    },
+    {
+     "action": "agree",
+     "screen": "plan-input"
+    },
+    {
+     "action": "ask",
+     "screen": "proposal",
+     "vars": {
+      "ask": "묻는 중",
+      "est": "30분"
+     }
+    },
+    {
+     "action": "est-60",
+     "screen": "proposal",
+     "vars": {
+      "est": "60분",
+      "ask": "답함"
+     }
+    },
+    {
+     "action": "fit-partial",
+     "screen": "proposal",
+     "vars": {
+      "fit": "오늘 1시간 30분만"
+     }
+    },
+    {
+     "action": "apply",
+     "screen": "applied"
+    },
+    {
+     "action": "done-applied",
+     "screen": "today"
+    }
+   ]
+  },
+  {
+   "id": "plan-timeout",
+   "title": "하루 정리 · 2분 동안 답 없음, 내일로 옮기기",
+   "start": "plan-input",
+   "steps": [
+    {
+     "action": "ask",
+     "screen": "proposal"
+    },
+    {
+     "action": "est-timeout",
+     "screen": "proposal",
+     "vars": {
+      "est": "30분",
+      "ask": "시간 지남"
+     }
+    },
+    {
+     "action": "fit-later",
+     "screen": "proposal",
+     "vars": {
+      "fit": "내일 08:00로 옮김"
+     }
+    },
+    {
+     "action": "apply",
+     "screen": "applied"
+    }
+   ]
+  },
+  {
+   "id": "plan-fail",
+   "title": "비서 실패 · 직접 입력",
+   "start": "plan-input",
+   "steps": [
+    {
+     "action": "fail",
+     "screen": "assistant-failed"
+    },
+    {
+     "action": "manual-add",
+     "screen": "today",
+     "hint": "할 일 제목을 입력하세요."
+    }
+   ]
+  },
+  {
+   "id": "session",
+   "title": "세션 · 사진 찍고 시작해서 더 해야 해요",
+   "start": "today",
+   "steps": [
+    {
+     "action": "start-now",
+     "screen": "session-start"
+    },
+    {
+     "action": "take-photo",
+     "screen": "camera"
+    },
+    {
+     "action": "shoot",
+     "screen": "live",
+     "vars": {
+      "photo": "앱 촬영 첨부"
+     }
+    },
+    {
+     "action": "end",
+     "screen": "session-end"
+    },
+    {
+     "action": "more",
+     "screen": "reschedule",
+     "vars": {
+      "outcome": "더 해야 해요"
+     }
+    },
+    {
+     "action": "apply-reschedule",
+     "screen": "applied"
+    }
+   ]
+  },
+  {
+   "id": "join",
+   "title": "함께 · 같이 하기",
+   "start": "together",
+   "steps": [
+    {
+     "action": "join",
+     "screen": "session-start",
+     "vars": {
+      "together": "가온과 함께"
+     }
+    },
+    {
+     "action": "start-plain",
+     "screen": "live",
+     "vars": {
+      "photo": "사진 없는 기록"
+     }
+    },
+    {
+     "action": "end",
+     "screen": "session-end"
+    },
+    {
+     "action": "finished",
+     "screen": "today",
+     "vars": {
+      "outcome": "끝냈어요"
+     }
+    }
+   ]
+  },
+  {
+   "id": "correct",
+   "title": "기록 · 나중에 정정",
+   "start": "record",
+   "steps": [
+    {
+     "action": "open-day",
+     "screen": "record-day"
+    },
+    {
+     "action": "correct",
+     "screen": "correct"
+    },
+    {
+     "action": "save-correct",
+     "screen": "record-day",
+     "vars": {
+      "corrected": "나중에 정정함"
+     }
+    }
+   ]
+  }
+ ],
+ "decisions": [
+  {
+   "screen": "session-start",
+   "question": "공개 대상이 크루일 때 고른 크루에게만 보일지, 고른 크루와 내 친구 모두에게 보일지 정해야 합니다(지금 서버는 크루+친구)."
+  },
+  {
+   "screen": "proposal",
+   "question": "예상 시간 질문에 알림에서 바로 답하게 할지 정해야 합니다(지금은 알림으로 알리기만 하고 앱에서 답함)."
+  },
+  {
+   "screen": "proposal",
+   "question": "건너뛰거나 답이 없을 때 할 일의 예상 시간에도 30분을 저장할지 정해야 합니다(지금은 블록만 30분, 예상 시간은 비워 둠)."
+  },
+  {
+   "screen": "code",
+   "question": "코드가 틀렸을 때와 만료됐을 때의 문구, 다시 받기 간격을 정해야 합니다."
+  },
+  {
+   "screen": "together-empty",
+   "question": "친구가 없을 때 초대 링크를 줄지 정해야 합니다."
+  }
+ ],
+ "review": {
+  "locale": "ko",
+  "artboard": {
+   "width": 390,
+   "height": 844
+  },
+  "groupDirection": "vertical",
+  "requirements": [
+   {
+    "id": "school-mail",
+    "group": "가입",
+    "screen": "email",
+    "title": "학교 메일로만 가입",
+    "expected": "고려대 메일이 아니면 가입할 수 없고 다시 입력하게 한다.",
+    "action": "wrong-domain",
+    "origin": "source"
+   },
+   {
+    "id": "draft-only",
+    "group": "비서",
+    "screen": "proposal",
+    "title": "적용 전에는 저장하지 않음",
+    "expected": "초안을 닫으면 아무것도 저장되지 않고 오늘로 돌아간다.",
+    "action": "discard",
+    "origin": "source"
+   },
+   {
+    "id": "ask-estimate",
+    "group": "비서",
+    "screen": "proposal",
+    "title": "예상 시간이 없으면 30분으로 잡고 묻기",
+    "expected": "답하면 그 길이로 바뀐다.",
+    "action": "est-60",
+    "origin": "source"
+   },
+   {
+    "id": "ask-skip",
+    "group": "비서",
+    "screen": "proposal",
+    "title": "건너뛰면 30분",
+    "expected": "건너뛰기를 누르면 30분으로 둔다.",
+    "action": "est-skip",
+    "origin": "source"
+   },
+   {
+    "id": "ask-timeout",
+    "group": "비서",
+    "screen": "proposal",
+    "title": "2분 동안 답이 없으면 30분",
+    "expected": "답이 없으면 30분으로 둔다.",
+    "action": "est-timeout",
+    "origin": "source"
+   },
+   {
+    "id": "fit-check",
+    "group": "비서",
+    "screen": "proposal",
+    "title": "다 들어가지 않는 일은 가용 시간 점검",
+    "expected": "가용 시간을 보여 주고 일부만·다른 날·건너뛰기 중 고르게 한다.",
+    "action": "fit-partial",
+    "origin": "source"
+   },
+   {
+    "id": "fallback",
+    "group": "비서",
+    "screen": "plan-input",
+    "title": "비서 실패 시 직접 입력",
+    "expected": "실패하면 직접 입력으로 넘어가 할 일을 추가할 수 있다.",
+    "action": "fail",
+    "origin": "source"
+   },
+   {
+    "id": "photo-optional",
+    "group": "세션",
+    "screen": "session-start",
+    "title": "사진은 선택",
+    "expected": "사진 없이 시작할 수 있고 ‘사진 없는 기록’으로 표시된다.",
+    "action": "start-plain",
+    "origin": "source"
+   },
+   {
+    "id": "in-app-camera",
+    "group": "세션",
+    "screen": "camera",
+    "title": "앱 안 촬영",
+    "expected": "촬영하면 ‘앱 촬영 첨부’로 표시된다.",
+    "action": "shoot",
+    "origin": "source"
+   },
+   {
+    "id": "end-outcome",
+    "group": "세션",
+    "screen": "session-end",
+    "title": "종료할 때 결과 고르기",
+    "expected": "‘더 해야 해요’면 비서가 이어 할 시간을 제안한다.",
+    "action": "more",
+    "origin": "source"
+   },
+   {
+    "id": "join",
+    "group": "함께",
+    "screen": "together",
+    "title": "같이 하기",
+    "expected": "누르면 내 세션 시작으로 이어지고 ‘가온과 함께’로 표시된다.",
+    "action": "join",
+    "origin": "source"
+   },
+   {
+    "id": "correct-label",
+    "group": "기록",
+    "screen": "correct",
+    "title": "정정 표시",
+    "expected": "시간을 고치면 ‘나중에 정정함’이 남는다.",
+    "action": "save-correct",
+    "origin": "source"
+   },
+   {
+    "id": "empty-feed",
+    "group": "함께",
+    "screen": "together-empty",
+    "title": "친구가 없을 때",
+    "expected": "친구 찾기로 갈 수 있다.",
+    "action": "add-friend",
+    "origin": "inferred"
+   }
+  ],
+  "audit": {
+   "journeys": [
+    {
+     "title": "예상 시간 답하기",
+     "start": "plan-input",
+     "steps": [
+      {
+       "action": "ask",
+       "screen": "proposal"
+      },
+      {
+       "action": "est-60",
+       "screen": "proposal",
+       "vars": {
+        "est": "60분"
+       },
+       "requirement": "ask-estimate"
+      },
+      {
+       "action": "fit-partial",
+       "screen": "proposal",
+       "vars": {
+        "fit": "오늘 1시간 30분만"
+       },
+       "requirement": "fit-check"
+      },
+      {
+       "action": "apply",
+       "screen": "applied"
+      }
+     ]
+    },
+    {
+     "title": "사진 찍고 시작",
+     "start": "today",
+     "steps": [
+      {
+       "action": "start-now",
+       "screen": "session-start"
+      },
+      {
+       "action": "take-photo",
+       "screen": "camera"
+      },
+      {
+       "action": "shoot",
+       "screen": "live",
+       "vars": {
+        "photo": "앱 촬영 첨부"
+       },
+       "requirement": "in-app-camera"
+      },
+      {
+       "action": "end",
+       "screen": "session-end"
+      },
+      {
+       "action": "more",
+       "screen": "reschedule",
+       "requirement": "end-outcome"
+      }
+     ]
+    },
+    {
+     "title": "같이 하기",
+     "start": "together",
+     "steps": [
+      {
+       "action": "join",
+       "screen": "session-start",
+       "vars": {
+        "together": "가온과 함께"
+       },
+       "requirement": "join"
+      },
+      {
+       "action": "start-plain",
+       "screen": "live",
+       "vars": {
+        "photo": "사진 없는 기록"
+       },
+       "requirement": "photo-optional"
+      }
+     ]
+    },
+    {
+     "title": "정정 표시",
+     "start": "record",
+     "steps": [
+      {
+       "action": "open-day",
+       "screen": "record-day"
+      },
+      {
+       "action": "correct",
+       "screen": "correct"
+      },
+      {
+       "action": "save-correct",
+       "screen": "record-day",
+       "vars": {
+        "corrected": "나중에 정정함"
+       },
+       "requirement": "correct-label"
+      }
+     ]
+    }
+   ],
+   "recovery": [
+    {
+     "title": "학교 메일이 아님 → 다시 입력",
+     "start": "email",
+     "steps": [
+      {
+       "action": "wrong-domain",
+       "screen": "email-error",
+       "requirement": "school-mail"
+      },
+      {
+       "action": "retry-email",
+       "screen": "email",
+       "requirement": "school-mail"
+      }
+     ]
+    },
+    {
+     "title": "건너뛰면 30분",
+     "start": "plan-input",
+     "steps": [
+      {
+       "action": "ask",
+       "screen": "proposal"
+      },
+      {
+       "action": "est-skip",
+       "screen": "proposal",
+       "vars": {
+        "est": "30분",
+        "ask": "건너뜀"
+       },
+       "requirement": "ask-skip"
+      }
+     ]
+    },
+    {
+     "title": "2분 동안 답 없음",
+     "start": "plan-input",
+     "steps": [
+      {
+       "action": "ask",
+       "screen": "proposal"
+      },
+      {
+       "action": "est-timeout",
+       "screen": "proposal",
+       "vars": {
+        "est": "30분",
+        "ask": "시간 지남"
+       },
+       "requirement": "ask-timeout"
+      }
+     ]
+    },
+    {
+     "title": "초안을 적용하지 않고 닫기",
+     "start": "plan-input",
+     "steps": [
+      {
+       "action": "ask",
+       "screen": "proposal"
+      },
+      {
+       "action": "discard",
+       "screen": "today",
+       "requirement": "draft-only"
+      }
+     ]
+    },
+    {
+     "title": "비서 실패 → 직접 입력",
+     "start": "plan-input",
+     "steps": [
+      {
+       "action": "fail",
+       "screen": "assistant-failed",
+       "requirement": "fallback"
+      },
+      {
+       "field": "manualTitle",
+       "type": "input",
+       "value": "DB 과제 1번"
+      },
+      {
+       "action": "manual-add",
+       "screen": "today",
+       "requirement": "fallback"
+      }
+     ]
+    },
+    {
+     "title": "친구 없음 → 친구 찾기",
+     "start": "together",
+     "steps": [
+      {
+       "action": "no-friends",
+       "screen": "together-empty"
+      },
+      {
+       "action": "add-friend",
+       "screen": "friends",
+       "requirement": "empty-feed"
+      }
+     ]
+    },
+    {
+     "title": "카메라에서 뒤로",
+     "start": "session-start",
+     "steps": [
+      {
+       "action": "take-photo",
+       "screen": "camera"
+      },
+      {
+       "action": "back-camera",
+       "screen": "session-start"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}
