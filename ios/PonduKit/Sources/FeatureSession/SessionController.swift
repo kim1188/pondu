@@ -245,6 +245,8 @@ public final class SessionController: SessionControlling {
         guard let before = live, let choice = endDraft.choice, !isBusy else { return }
         let note = endDraft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         let todoID = currentTodoID
+        // 막대를 내리기 전에 서버 id를 잡아 둔다. live를 비운 뒤에는 읽을 수 없다.
+        let knownServerID = before.serverID
         live = nil
         route = .none
         isBusy = true
@@ -252,7 +254,16 @@ public final class SessionController: SessionControlling {
         mutationTask = Task {
             defer { self.isBusy = false }
             do {
-                let id = try await self.resolveServerID()
+                let id: UUID
+                if let knownServerID {
+                    id = knownServerID
+                } else {
+                    // 시작 요청이 아직 가는 중이면 끝나기를 기다린다. 끝나면 서버 값으로 live가 다시 채워진다.
+                    await self.startTask?.value
+                    guard let lateID = self.live?.serverID else { throw BackendError(code: "network") }
+                    id = lateID
+                    self.live = nil
+                }
                 let pair: SessionPair = try await self.backend.rpc("end_session", [
                     "p_session_id": .string(id.uuidString.lowercased()),
                     "p_outcome": .string(choice.serverValue),
@@ -264,6 +275,7 @@ public final class SessionController: SessionControlling {
                     self.adopt(pair, clientID: before.clientID)
                     return
                 }
+                self.live = nil
                 self.liveSession = nil
                 self.lastEndedSession = pair.dto
                 self.removePhotoFilesIfNoPending(clientID: before.clientID)
