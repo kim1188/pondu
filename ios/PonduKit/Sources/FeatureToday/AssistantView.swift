@@ -5,11 +5,13 @@ struct AssistantView: View {
     @State private var model: AssistantModel
     let today: TodayModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var manual = TodayModel.TodoDraft()
 
     init(kind: AssistantKind, text: String, signal: SessionEndSignal?, today: TodayModel) {
         self.today = today
-        _model = State(initialValue: AssistantModel(kind: kind, text: text, today: today, consent: UserDefaultsConsent(), signal: signal))
+        _model = State(initialValue: AssistantModel(kind: kind, text: text, today: today, consent: UserDefaultsConsent(), signal: signal,
+                                                      asker: LocalEstimateAskNotifier()))
     }
 
     var body: some View {
@@ -28,6 +30,8 @@ struct AssistantView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("닫기") { model.cancel(); dismiss() } } }
             .onAppear(perform: autoStart)
+            // 묻는 중에 앱을 떠나면 알림으로 알린다.
+            .onChange(of: scenePhase) { _, phase in if phase != .active { model.notifyPendingAsks() } }
         }
     }
 
@@ -71,6 +75,7 @@ struct AssistantView: View {
             let notes = model.estimateNotes()
             if !notes.isEmpty { Section("예상 시간 보정") { ForEach(notes, id: \.self) { Text($0).font(.subheadline) } } }
             if let p = env?.proposal {
+                if !model.pendingAsks.isEmpty { estimateAskSection(p) }
                 if !p.todos.isEmpty {
                     Section("새 할 일") {
                         ForEach(Array(p.todos.enumerated()), id: \.offset) { i, t in
@@ -105,9 +110,7 @@ struct AssistantView: View {
                         }
                     }
                 }
-                if !p.unscheduled.isEmpty {
-                    Section("시간을 못 잡았어요") { ForEach(p.unscheduled, id: \.todoRef) { Text($0.reason).font(.subheadline) } }
-                }
+                if !p.unscheduled.isEmpty { unscheduledSection(p, availability: env?.availability) }
                 if !p.questions.isEmpty {
                     Section("확인할 것") { ForEach(p.questions, id: \.self) { Text($0) } }
                 }
@@ -120,8 +123,8 @@ struct AssistantView: View {
                 Button("전부 적용") {
                     if let p = env?.proposal { model.selection = ProposalSelection(for: p) }
                     Task { await model.apply() }
-                }.disabled(model.isApplying || (env?.proposal.isEmpty ?? true))
-                Button("고른 것만 적용") { Task { await model.apply() } }.disabled(model.isApplying || (model.selection?.isEmpty ?? true))
+                }.disabled(model.isApplying || model.isAdjusting || (env?.proposal.isEmpty ?? true))
+                Button("고른 것만 적용") { Task { await model.apply() } }.disabled(model.isApplying || model.isAdjusting || (model.selection?.isEmpty ?? true))
                 Button("적용하지 않고 닫기", role: .cancel) { dismiss() }
             }
         }
@@ -148,6 +151,91 @@ struct AssistantView: View {
             if code != "quota_exceeded" { Section { Button("다시 시도") { model.send() } } }
         }
         .onAppear { if manual.title.isEmpty { manual = model.manualDraft() } }
+    }
+
+    // MARK: 예상 시간 묻기와 가용 시간
+
+    /// 예상 시간이 없어 30분으로 잡아 둔 일을 묻는다. 2분 안에 답이 없거나 건너뛰면 30분 그대로 둔다.
+    private func estimateAskSection(_ p: AssistantProposal) -> some View {
+        Section {
+            ForEach(model.pendingAsks, id: \.self) { ref in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("‘\(model.title(forRef: ref, in: p))’ 얼마나 걸릴까요?")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(AssistantModel.estimateChoices, id: \.self) { m in
+                                Button(Self.minutesText(m)) { Task { await model.answerEstimate(ref, minutes: m) } }
+                                    .buttonStyle(.bordered)
+                            }
+                            Button("건너뛰기") { model.skipEstimate(ref) }.buttonStyle(.borderless)
+                        }
+                    }
+                }
+                .disabled(model.isAdjusting)
+            }
+        } header: {
+            Text("예상 시간")
+        } footer: {
+            if let deadline = model.askDeadline {
+                TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                    let left = max(0, Int(deadline.timeIntervalSince(ctx.date).rounded(.up)))
+                    Text("일단 30분으로 잡아 뒀어요. \(left / 60)분 \(left % 60)초 안에 답이 없으면 그대로 둘게요.")
+                }
+            }
+        }
+    }
+
+    /// 시간을 못 잡은 일: 가용 시간을 보여 주고, 일부만 잡을지·다른 날로 옮길지·건너뛸지 고르게 한다.
+    private func unscheduledSection(_ p: AssistantProposal, availability: AssistantAvailability?) -> some View {
+        let checks = Dictionary(model.fitChecks.map { ($0.todoRef, $0) }, uniquingKeysWith: { a, _ in a })
+        return Section {
+            ForEach(p.unscheduled, id: \.todoRef) { u in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.title(forRef: u.todoRef, in: p))
+                    if let c = checks[u.todoRef] {
+                        Text("\(Self.minutesText(c.neededMinutes)) 필요 · 오늘 한 번에 쓸 수 있는 시간 \(Self.minutesText(c.largestTodayMinutes))")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(c.options, id: \.self) { option in
+                            if let label = fitLabel(option, check: c) {
+                                Button(label) { Task { await model.chooseFit(u.todoRef, option: option) } }
+                                    .buttonStyle(.bordered).font(.subheadline)
+                            }
+                        }
+                    } else if !u.reason.isEmpty {
+                        Text(u.reason).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(model.isAdjusting)
+            }
+        } header: {
+            Text("시간을 못 잡았어요")
+        } footer: {
+            if let t = availability?.today { Text("오늘 남은 빈 시간은 모두 \(Self.minutesText(t.freeMinutes))이에요.") }
+        }
+    }
+
+    private func fitLabel(_ option: String, check: FitCheck) -> String? {
+        switch option {
+        case "partial_today": return check.partialSlot.map { "오늘 \(slotTime($0, withDay: false))에 \(Self.minutesText($0.minutes))만 하기" }
+        case "move_later": return check.fullSlot.map { "\(slotTime($0, withDay: true))로 옮기기" }
+        case "place_today": return check.fullSlot.map { "오늘 \(slotTime($0, withDay: false))에 넣기" }
+        case "skip": return "이번엔 건너뛰기"
+        default: return nil
+        }
+    }
+
+    private func slotTime(_ slot: AvailabilitySlot, withDay: Bool) -> String {
+        guard let s = slot.startDate, let e = slot.endDate else { return "" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR"); f.timeZone = today.timeZone; f.dateFormat = withDay ? "M월 d일 HH:mm" : "HH:mm"
+        let g = DateFormatter()
+        g.locale = f.locale; g.timeZone = today.timeZone; g.dateFormat = "HH:mm"
+        return "\(f.string(from: s))~\(g.string(from: e))"
+    }
+
+    static func minutesText(_ m: Int) -> String {
+        if m < 60 { return "\(m)분" }
+        return m % 60 == 0 ? "\(m / 60)시간" : "\(m / 60)시간 \(m % 60)분"
     }
 
     // MARK: 도우미

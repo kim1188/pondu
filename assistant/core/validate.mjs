@@ -43,6 +43,9 @@ export function validate(input, proposal) {
     loc = { unscheduled: i };
     if (!resolveRef(u.todo_ref, input, proposal)) add('ref_unknown', `unscheduled 의 ${u.todo_ref}`);
   }
+  for (const ref of proposal.estimate_asks ?? []) {
+    if (!resolveRef(ref, input, proposal)) add('ref_unknown', `estimate_asks 의 ${ref}`);
+  }
 
   loc = null;
   if (input.kind === 'capture' && proposal.blocks.length) {

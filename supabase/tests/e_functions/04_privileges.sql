@@ -5,7 +5,7 @@ declare
 begin
   foreach f in array array[
     'assistant_run_begin(uuid,text,int)', 'assistant_run_finish(uuid,text,int,int,int,boolean)',
-    'assistant_thread_categories(uuid)', 'assistant_proposal_save(uuid,text,jsonb,jsonb)',
+    'assistant_thread_categories(uuid)', 'assistant_proposal_save(uuid,text,jsonb,jsonb)', 'assistant_proposal_get(uuid,uuid)',
     'delete_account_photo_paths(uuid)', 'notification_outbox_claim(int)',
     'notification_outbox_mark_sent(bigint[])', 'device_tokens_remove(text[])'
   ] loop

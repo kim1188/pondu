@@ -3,11 +3,17 @@
 import { AssistantError, runProposal } from './core/run.mjs';
 import { DEFAULT_MODEL } from './core/propose.mjs';
 import { withPlanningMinutes } from './core/estimate.mjs';
+import { adjustProposal, availability } from './core/availability.mjs';
 import { ms } from './core/time.mjs';
 import { blockToCore, todoToCore } from './convert.mjs';
 import { FnError, fromDbError } from './errors.mjs';
 
-export const KINDS = ['capture', 'plan_day', 'reschedule'];
+export const KINDS = ['capture', 'plan_day', 'reschedule', 'availability', 'adjust'];
+// adjust: 모델을 부르지 않고, 사용자의 답으로 저장된 제안을 고쳐 새 제안으로 저장한다(한도에 넣지 않는다).
+//   요청: {kind: 'adjust', proposal_id, estimates: [{todo_ref, minutes}], fits: [{todo_ref, option}], busy}
+//   응답 이벤트: proposal (보통 제안과 같은 모양 + replaces, estimate_updates, rejected). 원래 제안은 그대로 두고 만료된다.
+// availability: 모델을 부르지 않고 가용 시간만 계산해 돌려준다(한도에 넣지 않는다).
+//   응답 이벤트: availability {today: {free_minutes, largest_minutes, slots}, fit_checks: []}
 const MAX_TEXT = 4000;
 const MAX_PASTED = 20000;
 const MAX_BUSY = 200;
@@ -37,9 +43,19 @@ export function parseRequest(body, serverNow) {
       note: typeof session.note === 'string' ? session.note.slice(0, 200) : null,
     };
   }
+  let adjust = null;
+  if (kind === 'adjust') {
+    const { proposal_id, estimates = [], fits = [] } = body;
+    const ref = r => typeof r === 'string' && r.length <= 64;
+    if (typeof proposal_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(proposal_id)) throw new FnError('invalid_input', 400, 'proposal_id');
+    if (!Array.isArray(estimates) || !Array.isArray(fits) || estimates.length + fits.length === 0 || estimates.length + fits.length > 40) throw new FnError('invalid_input', 400, 'adjust');
+    if (!estimates.every(e => ref(e?.todo_ref) && Number.isInteger(e.minutes))) throw new FnError('invalid_input', 400, 'estimates');
+    if (!fits.every(f => ref(f?.todo_ref) && ['partial_today', 'move_later', 'place_today'].includes(f.option))) throw new FnError('invalid_input', 400, 'fits');
+    adjust = { proposal_id, estimates: estimates.map(e => ({ todo_ref: e.todo_ref, minutes: e.minutes })), fits: fits.map(f => ({ todo_ref: f.todo_ref, option: f.option })) };
+  }
   // 기준 시각은 서버가 정한다. 요청의 now는 읽지 않는다(과거 시각으로 규칙 검사를 피하는 것을 막는다).
   const now = new Date(serverNow).toISOString();
-  return { kind, text, pasted: pasted || null, busy: cleanBusy, session: cleanSession, now };
+  return { kind, text, pasted: pasted || null, busy: cleanBusy, session: cleanSession, now, adjust };
 }
 
 /**
@@ -101,6 +117,34 @@ export async function handleAssistant({ body, userId, deps, emit }) {
   let ok = false;
   try {
     const req = parseRequest(body, started);
+    if (req.kind === 'availability') {
+      let ctx0;
+      try { ctx0 = await db.context(userId, req.now); } catch (e) { throw fromDbError(e); }
+      const { input: input0 } = buildCoreInput({ ...req, kind: 'plan_day' }, ctx0, {});
+      emit('availability', availability(input0));
+      return;
+    }
+    if (req.kind === 'adjust') {
+      let saved, ctx0;
+      try { saved = await db.proposalGet(userId, req.adjust.proposal_id); } catch (e) { throw fromDbError(e); }
+      if (!saved) throw new FnError('proposal_not_found', 404);
+      try { ctx0 = await db.context(userId, req.now); } catch (e) { throw fromDbError(e); }
+      let cats0 = {};
+      if ((ctx0?.todos ?? []).some(t => !('category' in t))) {
+        try { cats0 = await db.threadCategories(userId); } catch (e) { throw fromDbError(e); }
+      }
+      const built = buildCoreInput({ ...req, kind: saved.kind }, ctx0, cats0);
+      const adj = adjustProposal(built.input, saved.proposal, req.adjust);
+      let newId;
+      try { newId = await db.saveProposal(userId, saved.kind, { kind: saved.kind, now: req.now }, adj.proposal); } catch (e) { throw fromDbError(e); }
+      emit('proposal', {
+        proposal_id: newId, proposal: adj.proposal, dropped: [], calibration: built.calibration,
+        expires_at: new Date(deps.now() + 24 * 3600 * 1000).toISOString(),
+        availability: saved.kind === 'capture' ? null : availability(adj.input, adj.proposal),
+        replaces: req.adjust.proposal_id, estimate_updates: adj.estimate_updates, rejected: adj.rejected,
+      });
+      return;
+    }
     try { runId = await db.runBegin(userId, req.kind, config.dailyLimit); } catch (e) { throw fromDbError(e); }
 
     let ctx;
@@ -132,7 +176,9 @@ export async function handleAssistant({ body, userId, deps, emit }) {
     ok = true;
     // 제안은 만든 지 24시간이 지나면 적용할 수 없다(D가 막는다). 앱이 안내에 쓰도록 만료 시각을 같이 준다.
     const expires_at = new Date(deps.now() + 24 * 3600 * 1000).toISOString();
-    emit('proposal', { proposal_id: proposalId, proposal: stored, dropped: result.dropped, calibration, expires_at });
+    // 가용 시간과, 못 넣은 일마다의 "들어갈 자리" 점검은 코드가 계산해 붙인다. 일부만 잡을지는 사용자가 고른다.
+    const avail = req.kind === 'capture' ? null : availability(input, stored);
+    emit('proposal', { proposal_id: proposalId, proposal: stored, dropped: result.dropped, calibration, expires_at, availability: avail });
   } catch (e) {
     const code = e instanceof FnError ? e.code : 'assistant_unavailable';
     emit('error', { code });

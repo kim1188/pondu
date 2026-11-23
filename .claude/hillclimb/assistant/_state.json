@@ -37,6 +37,7 @@
     "assistant/core/schema.mjs",
     "assistant/core/validate.mjs",
     "assistant/core/time.mjs",
+    "assistant/core/availability.mjs",
     "assistant/eval/cases.mjs",
     "assistant/eval/grade.mjs",
     "assistant/providers/openai.mjs",

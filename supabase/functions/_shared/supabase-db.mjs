@@ -14,6 +14,7 @@ export const makeDb = admin => ({
   }),
   context: (userId, now) => call(admin, 'assistant_context', { p_user: userId, p_now: now }),
   threadCategories: userId => call(admin, 'assistant_thread_categories', { p_user: userId }),
+  proposalGet: (userId, id) => call(admin, 'assistant_proposal_get', { p_user: userId, p_id: id }),
   saveProposal: (userId, kind, input, proposal) => call(admin, 'assistant_proposal_save', { p_user: userId, p_kind: kind, p_input: input, p_proposal: proposal }),
   cleanupCrews: userId => call(admin, 'delete_account_cleanup_crews', { p_user: userId }),
   photoPaths: userId => call(admin, 'delete_account_photo_paths', { p_user: userId }),

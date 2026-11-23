@@ -14,7 +14,7 @@ const todo = (id, title, extra = {}) => ({ id, title, due_date: null, due_time: 
 const T = (title, due_date = null, due_time = null, estimate_min = null) => ({ title, due_date, due_time, estimate_min, category: null });
 const B = (todo_ref, date, s, e) => ({ todo_ref, start: at(date, s), end: at(date, e) });
 const win = (date, s, e) => ({ start: at(date, s), end: at(date, e) });
-const P = (p = {}) => ({ todos: [], blocks: [], done_todo_ids: [], unscheduled: [], questions: [], message: '제안입니다.', ...p });
+const P = (p = {}) => ({ todos: [], blocks: [], done_todo_ids: [], unscheduled: [], estimate_asks: [], questions: [], message: '제안입니다.', ...p });
 const U = (todo_ref, reason = '시간이 모자람') => ({ todo_ref, reason });
 
 function mk(id, kind, tag, input, expect, oracle) {
@@ -113,8 +113,9 @@ export const CASES = [
     now: at(D.mon, '20:00'), text: '오늘 남은 시간 계획 짜줘',
     busy: [win(D.mon, '20:00', '21:00')],
     todos: [todo('t1', '컴파일러 과제', { estimate_min: 180, due_date: D.tue, due_time: '09:00' }), todo('t2', '확률 문제 풀이', { estimate_min: 120 }), todo('t3', '블로그 글쓰기', { estimate_min: 60 })],
-  }, { blocks: [1, 9], unscheduled_min: 1, scheduled: ['t1'] },
-    P({ blocks: [B('t1', D.mon, '21:00', '23:00')], unscheduled: [U('t2'), U('t3')] })),
+  // 3시간짜리 t1은 남은 2시간에 다 들어가지 않는다. 일부만 잡지 않고 못 넣은 일로 돌린다(가용 시간 안내는 코드가 붙인다).
+  }, { blocks: [1, 9], unscheduled_min: 1, not_scheduled: ['t1'] },
+    P({ blocks: [B('t2', D.mon, '21:00', '23:00')], unscheduled: [U('t1'), U('t3')] })),
   mk('p04', 'plan_day', 'deadline', {
     text: '오늘 계획 짜줘',
     busy: [win(D.mon, '13:00', '15:00')],
@@ -134,7 +135,7 @@ export const CASES = [
     now: at(D.mon, '21:30'), text: '지금부터 할 수 있는 만큼만 잡아줘',
     todos: [todo('t1', '운영체제 과제', { estimate_min: 120 }), todo('t2', '수학 문제집', { estimate_min: 60 })],
   }, { blocks: [1, 9], unscheduled_min: 1 },
-    P({ blocks: [B('t1', D.mon, '21:30', '23:00')], unscheduled: [U('t2')] })),
+    P({ blocks: [B('t2', D.mon, '21:30', '22:30')], unscheduled: [U('t1')] })),
   mk('p08', 'plan_day', 'user_pref', {
     text: '오늘 계획 짜줘. 운동은 저녁 6시 이후에 하고 싶어',
     todos: [todo('t1', '회로이론 복습', { estimate_min: 60 }), todo('t3', '운동', { estimate_min: 40 })],
@@ -149,8 +150,9 @@ export const CASES = [
   mk('p10', 'plan_day', 'no_estimate', {
     text: '오늘 계획 짜줘',
     todos: [todo('t1', '캡스톤 회의록 정리')],
+  // 예상 시간이 없으면 30분으로 잡고, 앱이 물을 수 있게 estimate_asks 에 넣는다.
   }, { scheduled: ['t1'] },
-    P({ blocks: [B('t1', D.mon, '09:00', '09:40')] })),
+    P({ blocks: [B('t1', D.mon, '09:00', '09:30')], estimate_asks: ['t1'] })),
   mk('p11', 'plan_day', 'deadline', {
     text: '오늘 계획 짜줘',
     busy: [win(D.mon, '10:00', '12:00'), win(D.mon, '13:00', '17:00'), win(D.mon, '18:00', '20:00')],
@@ -167,7 +169,7 @@ export const CASES = [
     text: '오늘 DB 과제랑 영어 단어 외우기 넣어줘',
     todos: [todo('t1', 'DB 과제', { estimate_min: 60 })],
   }, { todos: [1, 1], titles: [['영어', '단어']], scheduled: ['t1', ['영어', '단어']] },
-    P({ todos: [T('영어 단어 외우기')], blocks: [B('t1', D.mon, '09:00', '10:00'), B('new:0', D.mon, '10:30', '11:00')] })),
+    P({ todos: [T('영어 단어 외우기')], blocks: [B('t1', D.mon, '09:00', '10:00'), B('new:0', D.mon, '10:30', '11:00')], estimate_asks: ['new:0'] })),
   mk('p14', 'plan_day', 'done_excluded', {
     text: '오늘 계획 짜줘',
     todos: [todo('t1', '이산수학 과제', { estimate_min: 60 }), todo('t2', '기숙사 신청서', { estimate_min: 20, status: 'done' })],
@@ -229,7 +231,7 @@ export const CASES = [
     blocks: [{ id: 'b1', todo_id: 't1', start: at(D.mon, '14:00'), end: at(D.mon, '15:00'), locked: false, status: 'missed' }],
     todos: [todo('t1', '실험 보고서 제출', { estimate_min: 60, due_date: D.mon, due_time: '18:00' })],
   }, { resolved: ['t1'] },
-    P({ blocks: [B('t1', D.mon, '17:30', '18:00')] })),
+    P({ unscheduled: [U('t1', '마감 전에 다 들어갈 자리가 없음')] })),
   mk('r07', 'reschedule', 'priority', {
     now: at(D.mon, '21:00'), text: '놓친 일 다시 잡아줘',
     busy: [win(D.mon, '22:00', '23:00'), win(D.tue, '08:00', '10:00')],

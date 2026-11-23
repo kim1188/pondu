@@ -8,7 +8,7 @@ export const CATEGORIES = [
 export const PROPOSAL_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['todos', 'blocks', 'done_todo_ids', 'unscheduled', 'questions', 'message'],
+  required: ['todos', 'blocks', 'done_todo_ids', 'unscheduled', 'estimate_asks', 'questions', 'message'],
   properties: {
     // message를 맨 앞에 둔다: 모델이 속성을 스키마 순서대로 쓰므로, 서버가 message를 먼저 흘려보낼 수 있다.
     message: { type: 'string', description: '사용자에게 보여 줄 한두 문장.' },
@@ -57,6 +57,11 @@ export const PROPOSAL_SCHEMA = {
         properties: { todo_ref: { type: 'string' }, reason: { type: 'string' } },
       },
     },
+    estimate_asks: {
+      type: 'array',
+      description: '예상 시간이 없어서 기본 30분으로 잡은 할 일의 todo_ref. 앱이 사용자에게 얼마나 걸릴지 묻는다.',
+      items: { type: 'string' },
+    },
     questions: {
       type: 'array',
       description: '진행하려면 꼭 확인해야 하는 것만. 없으면 빈 배열.',
@@ -66,5 +71,5 @@ export const PROPOSAL_SCHEMA = {
 };
 
 export const EMPTY_PROPOSAL = Object.freeze({
-  todos: [], blocks: [], done_todo_ids: [], unscheduled: [], questions: [], message: '',
+  todos: [], blocks: [], done_todo_ids: [], unscheduled: [], estimate_asks: [], questions: [], message: '',
 });

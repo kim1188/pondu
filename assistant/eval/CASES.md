@@ -28,7 +28,7 @@
 | c20 | capture | done | DB 과제는 이미 냈고, 이제 네트워크 과제만 하면 돼 | `{"todos":[1,1],"titles":[["네트워크"]],"forbid_titles":[["DB"]],"done":["t1"]}` |
 | p01 | plan_day | basic | 오늘 계획 짜줘 | `{"scheduled":["t1","t2","t3"]}` |
 | p02 | plan_day | packed | 오늘 계획 짜줘 | `{"scheduled":["t1","t2"]}` |
-| p03 | plan_day | overload | 오늘 남은 시간 계획 짜줘 | `{"blocks":[1,9],"unscheduled_min":1,"scheduled":["t1"]}` |
+| p03 | plan_day | overload | 오늘 남은 시간 계획 짜줘 | `{"blocks":[1,9],"unscheduled_min":1,"not_scheduled":["t1"]}` |
 | p04 | plan_day | deadline | 오늘 계획 짜줘 | `{"scheduled":["t1","t2"]}` |
 | p05 | plan_day | locked | 오늘 계획 짜줘 | `{"scheduled":["t1"]}` |
 | p06 | plan_day | empty | 오늘 계획 짜줘 | `{"todos":[0,0],"blocks":[0,0]}` |
@@ -118,6 +118,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -183,6 +184,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -263,6 +265,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -330,6 +333,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -397,6 +401,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -453,6 +458,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -514,6 +520,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -557,6 +564,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [
   "어떤 일을 말씀하시는 건가요?"
  ],
@@ -615,6 +623,7 @@
   "t1"
  ],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -667,6 +676,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -709,6 +719,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -782,6 +793,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -841,6 +853,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -887,6 +900,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -939,6 +953,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1008,6 +1023,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1092,6 +1108,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1170,6 +1187,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1240,6 +1258,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1314,6 +1333,7 @@
   "t1"
  ],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1407,6 +1427,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1482,6 +1503,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1545,7 +1567,7 @@
   9
  ],
  "unscheduled_min": 1,
- "scheduled": [
+ "not_scheduled": [
   "t1"
  ]
 }
@@ -1557,7 +1579,7 @@
  "todos": [],
  "blocks": [
   {
-   "todo_ref": "t1",
+   "todo_ref": "t2",
    "start": "2026-11-23T21:00:00+09:00",
    "end": "2026-11-23T23:00:00+09:00"
   }
@@ -1565,7 +1587,7 @@
  "done_todo_ids": [],
  "unscheduled": [
   {
-   "todo_ref": "t2",
+   "todo_ref": "t1",
    "reason": "시간이 모자람"
   },
   {
@@ -1573,6 +1595,7 @@
    "reason": "시간이 모자람"
   }
  ],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1648,6 +1671,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1721,6 +1745,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1767,6 +1792,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1826,18 +1852,19 @@
  "todos": [],
  "blocks": [
   {
-   "todo_ref": "t1",
+   "todo_ref": "t2",
    "start": "2026-11-23T21:30:00+09:00",
-   "end": "2026-11-23T23:00:00+09:00"
+   "end": "2026-11-23T22:30:00+09:00"
   }
  ],
  "done_todo_ids": [],
  "unscheduled": [
   {
-   "todo_ref": "t2",
+   "todo_ref": "t1",
    "reason": "시간이 모자람"
   }
  ],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -1911,6 +1938,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2006,6 +2034,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2057,11 +2086,14 @@
   {
    "todo_ref": "t1",
    "start": "2026-11-23T09:00:00+09:00",
-   "end": "2026-11-23T09:40:00+09:00"
+   "end": "2026-11-23T09:30:00+09:00"
   }
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [
+  "t1"
+ ],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2147,6 +2179,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2222,6 +2255,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2305,6 +2339,9 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [
+  "new:0"
+ ],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2372,6 +2409,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2442,6 +2480,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2518,6 +2557,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2583,6 +2623,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2644,6 +2685,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2709,6 +2751,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2795,6 +2838,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2892,6 +2936,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -2948,15 +2993,15 @@
 ````json
 {
  "todos": [],
- "blocks": [
+ "blocks": [],
+ "done_todo_ids": [],
+ "unscheduled": [
   {
    "todo_ref": "t1",
-   "start": "2026-11-23T17:30:00+09:00",
-   "end": "2026-11-23T18:00:00+09:00"
+   "reason": "마감 전에 다 들어갈 자리가 없음"
   }
  ],
- "done_todo_ids": [],
- "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3058,6 +3103,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3147,6 +3193,7 @@
   "t1"
  ],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3217,6 +3264,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3281,6 +3329,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3350,6 +3399,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3418,6 +3468,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3492,6 +3543,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3578,6 +3630,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3686,6 +3739,7 @@
    "reason": "시간이 모자람"
   }
  ],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3758,6 +3812,7 @@
    "reason": "시간이 모자람"
   }
  ],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3854,6 +3909,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -3925,6 +3981,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -4001,6 +4058,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -4073,6 +4131,7 @@
   "t1"
  ],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -4148,6 +4207,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -4214,6 +4274,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -4287,6 +4348,7 @@
  ],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }
@@ -4347,6 +4409,7 @@
  "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
+ "estimate_asks": [],
  "questions": [],
  "message": "제안입니다."
 }

@@ -26,6 +26,7 @@ export function parseProposal(text) {
   if (!o || typeof o !== 'object') return null;
   for (const k of ['todos', 'blocks', 'done_todo_ids', 'unscheduled', 'questions']) if (!Array.isArray(o[k])) return null;
   if (typeof o.message !== 'string') return null;
+  if (!Array.isArray(o.estimate_asks)) o.estimate_asks = []; // 예전 형식의 제안도 읽는다
   return o;
 }
 

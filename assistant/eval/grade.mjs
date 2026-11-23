@@ -110,6 +110,19 @@ export function grade(c, proposal) {
   for (const w of x.avoid ?? []) {
     if (proposal.blocks.some(b => overlaps(ms(b.start), ms(b.end), ms(w.start), ms(w.end)))) fails.push('사용자가 비워 달라고 한 시간과 겹침');
   }
+  // 정책(모든 사례 공통): 한 가지 일은 예상 시간만큼 통째로 잡고, 예상 시간이 없는 일은 30분으로 잡고 묻는다.
+  for (const ref of new Set(proposal.blocks.map(b => b.todo_ref))) {
+    const t = resolveRef(ref, input, proposal);
+    if (!t) continue;
+    const total = blocksFor(ref, proposal).reduce((a, b) => a + (ms(b.end) - ms(b.start)) / 60000, 0);
+    const est = t.planning_min ?? t.estimate_min ?? null;
+    if (est == null) {
+      if (!(proposal.estimate_asks ?? []).includes(ref)) fails.push(`${ref} 예상 시간이 없는데 estimate_asks 에 넣지 않음`);
+      if (total !== 30) fails.push(`${ref} 예상 시간이 없는 일을 ${total}분으로 잡음 (기대 30분)`);
+    } else if (total < Math.min(est, 240)) {
+      fails.push(`${ref} 를 일부만 잡음 (${total}/${est}분)`);
+    }
+  }
   // 가리키는 대상이 없는 참조는 규칙 검사에서도 잡히지만 설명에 남긴다
   for (const b of proposal.blocks) if (!resolveRef(b.todo_ref, input, proposal)) fails.push(`알 수 없는 참조 ${b.todo_ref}`);
 

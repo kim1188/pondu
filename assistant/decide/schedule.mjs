@@ -5,14 +5,12 @@
 // 그래서 고정 일정과 겹침, 잠긴 계획과 겹침, 마감 뒤 배치, 활동 시간대 밖 배치가 구조상 나올 수 없다.
 //
 // 할 수 없는 것: 새 할 일의 제목 쓰기. 결정 모델은 글을 쓰지 않으므로 capture(말 → 할 일)는 이 도메인 밖이다.
+import { freeIntervals, planningMinutes } from '../core/availability.mjs';
 import { dueMs, localDate, localHM, ms, at } from '../core/time.mjs';
 import { picking } from './loop.mjs';
 
 const MIN = 60000;
 const GRID_MIN = 30;        // 시작 시각 후보의 간격
-const MIN_BLOCK = 10;
-const MAX_BLOCK = 240;
-const DEFAULT_MIN = 30;     // 예상 시간이 없을 때
 const MAX_CHOICES_PER_DAY = 8;
 const DONE_THRESHOLD = 0.8; // 끝냈다는 말로 볼 확률의 하한. 거짓 완료를 피하려고 높게 둔다
 
@@ -23,39 +21,12 @@ const dayLabel = (t, now) => {
   return (['오늘', '내일', '모레'][d] ?? `${d}일 뒤`) + ` ${localDate(t).slice(5).replace('-', '/')}`;
 };
 
-/** [s,e] 구간 목록에서 막힌 구간들을 뺀다. */
-function subtract(intervals, blocked) {
-  let out = intervals;
-  for (const b of blocked) {
-    out = out.flatMap(([s, e]) => (b.e <= s || b.s >= e ? [[s, e]] : [[s, Math.min(e, b.s)], [Math.max(s, b.e), e]].filter(([x, y]) => y > x)));
-  }
-  return out;
-}
-
-/** 지금부터 며칠 동안의 빈 구간. 활동 시간대 안, 지금 이후, 고정 일정·잠긴 계획·이미 놓은 블록을 뺀 것. */
-export function freeIntervals(input, placed, days) {
-  const now = ms(input.now);
-  const prefs = { day_start: '08:00', day_end: '23:00', ...(input.prefs ?? {}) };
-  const today0 = ms(at(localDate(now), '00:00'));
-  const windows = [];
-  for (let d = 0; d < days; d++) {
-    const date = localDate(today0 + d * 86400000);
-    const s = Math.max(ms(at(date, prefs.day_start)), ceilTo(now, 5));
-    const e = ms(at(date, prefs.day_end));
-    if (e > s) windows.push([s, e]);
-  }
-  const blocked = [
-    ...(input.busy ?? []).map(b => ({ s: ms(b.start), e: ms(b.end) })),
-    ...(input.blocks ?? []).filter(b => b.locked).map(b => ({ s: ms(b.start), e: ms(b.end) })),
-    ...placed.map(b => ({ s: b.s, e: b.e })),
-  ];
-  return subtract(windows, blocked);
-}
+export { freeIntervals };
 
 /** 할 일 하나를 놓을 수 있는 자리들. 전부 규칙을 지킨다. */
 export function slotChoices(input, todo, placed, { days, excludeToday }) {
   const now = ms(input.now);
-  const want = Math.min(MAX_BLOCK, Math.max(MIN_BLOCK, todo.planning_min ?? todo.estimate_min ?? DEFAULT_MIN));
+  const want = planningMinutes(todo);
   const due = dueMs(todo);
   const today = localDate(now);
   let free = freeIntervals(input, placed, days);
@@ -69,13 +40,8 @@ export function slotChoices(input, todo, placed, { days, excludeToday }) {
     for (let t = ceilTo(s, GRID_MIN); t + want * MIN <= e; t += GRID_MIN * MIN) starts.add(t);
     for (const t of [...starts].sort((a, b) => a - b)) if (t + want * MIN <= e) full.push({ s: t, e: t + want * MIN });
   }
-  let slots = full, partial = false;
-  if (!full.length) {
-    // 다 들어갈 자리가 없으면 가장 긴 자리 몇 개를 "일부만" 으로 낸다.
-    partial = true;
-    slots = free.map(([s, e]) => ({ s, e: s + Math.floor((Math.min(e - s, want * MIN)) / (5 * MIN)) * 5 * MIN }))
-      .filter(b => b.e - b.s >= MIN_BLOCK * MIN).sort((a, b) => (b.e - b.s) - (a.e - a.s)).slice(0, 3).sort((a, b) => a.s - b.s);
-  }
+  // 다 들어갈 자리가 없으면 선택지를 내지 않는다. 일부만 잡을지는 가용 시간을 보여 주고 사용자가 정한다(core/availability.mjs).
+  const slots = full;
   // 날마다 고르게 솎아 선택지 수를 묶는다(아침·낮·저녁이 모두 남도록).
   const byDay = new Map();
   for (const b of slots) { const d = localDate(b.s); byDay.set(d, [...(byDay.get(d) ?? []), b]); }
@@ -88,7 +54,7 @@ export function slotChoices(input, todo, placed, { days, excludeToday }) {
     const minutes = Math.round((b.e - b.s) / MIN);
     return {
       key: `slot${i}`, s: b.s, e: b.e,
-      text: `${dayLabel(b.s, now)} ${localHM(b.s)}~${localHM(b.e)} (${minutes}분${partial ? `, 필요한 ${want}분 중 일부` : ''})`,
+      text: `${dayLabel(b.s, now)} ${localHM(b.s)}~${localHM(b.e)} (${minutes}분)`,
     };
   });
 }
@@ -238,6 +204,8 @@ export function toProposal(input, state) {
     blocks,
     done_todo_ids: state.done,
     unscheduled: state.unscheduled.map(id => ({ todo_ref: id, reason: '알맞은 시간이 없거나 지금은 잡지 않기로 함' })),
+    // 예상 시간이 없어 30분으로 잡은 일. 앱이 얼마나 걸릴지 묻는다.
+    estimate_asks: state.placed.map(b => b.todo_id).filter(id => { const t = (input.todos ?? []).find(x => x.id === id); return t && t.planning_min == null && t.estimate_min == null; }),
     questions: [],
     message: parts.join(' '),
   };

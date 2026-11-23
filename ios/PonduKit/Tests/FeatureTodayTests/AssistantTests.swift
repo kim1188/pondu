@@ -185,3 +185,119 @@ final class ProposalSelectionTests: XCTestCase {
         XCTAssertEqual(model.phase, .applied)
     }
 }
+
+private let askJSON = """
+{"proposal_id":"dddddddd-0000-0000-0000-000000000002",
+ "proposal":{"todos":[{"title":"영어 단어","due_date":null,"due_time":null,"estimate_min":null,"category":null}],
+  "blocks":[{"todo_ref":"new:0","start":"2026-11-23T21:00:00+09:00","end":"2026-11-23T21:30:00+09:00"}],
+  "done_todo_ids":[],"unscheduled":[{"todo_ref":"\(Fixture.todoA)","reason":"자리가 없음"}],
+  "estimate_asks":["new:0"],"questions":[],"message":"오늘 계획이에요."},
+ "dropped":[],
+ "availability":{"today":{"free_minutes":90,"largest_minutes":90,"slots":[]},
+  "fit_checks":[{"todo_ref":"\(Fixture.todoA)","needed_minutes":180,"largest_today_minutes":90,
+    "largest_before_due_minutes":null,"fits_within_days":2,"options":["partial_today","move_later","skip"],
+    "partial_slot":{"start":"2026-11-23T21:30:00+09:00","end":"2026-11-23T23:00:00+09:00","minutes":90},
+    "full_slot":{"start":"2026-11-24T08:00:00+09:00","end":"2026-11-24T11:00:00+09:00","minutes":180}}]}}
+"""
+
+private let adjustedJSON = """
+{"proposal_id":"dddddddd-0000-0000-0000-000000000003",
+ "proposal":{"todos":[{"title":"영어 단어","due_date":null,"due_time":null,"estimate_min":60,"category":null}],
+  "blocks":[{"todo_ref":"new:0","start":"2026-11-23T21:00:00+09:00","end":"2026-11-23T22:00:00+09:00"}],
+  "done_todo_ids":[],"unscheduled":[],"estimate_asks":[],"questions":[],"message":"오늘 계획이에요."},
+ "dropped":[],"availability":{"today":{"free_minutes":60,"largest_minutes":60,"slots":[]},"fit_checks":[]},
+ "replaces":"dddddddd-0000-0000-0000-000000000002","estimate_updates":[],"rejected":[]}
+"""
+
+final class EstimateAskTests: XCTestCase {
+    func testOldResponseWithoutNewFieldsStillDecodes() {
+        var state = AssistantStreamState()
+        AssistantStream.reduce(&state, event: Fixture.sse("proposal", proposalJSON))
+        let env = AssistantStream.envelope(from: state)
+        XCTAssertEqual(env?.proposal.estimateAsks, [])
+        XCTAssertNil(env?.availability)
+        XCTAssertEqual(env?.estimateUpdates, [])
+    }
+
+    func testDecodesAsksAndFitChecks() {
+        var state = AssistantStreamState()
+        AssistantStream.reduce(&state, event: Fixture.sse("proposal", askJSON))
+        let env = AssistantStream.envelope(from: state)
+        XCTAssertEqual(env?.proposal.estimateAsks, ["new:0"])
+        XCTAssertEqual(env?.availability?.today.freeMinutes, 90)
+        XCTAssertEqual(env?.availability?.fitChecks.first?.options, ["partial_today", "move_later", "skip"])
+        XCTAssertEqual(env?.availability?.fitChecks.first?.partialSlot?.minutes, 90)
+    }
+
+    func testAdjustBody() {
+        let id = UUID(uuidString: "dddddddd-0000-0000-0000-000000000002")!
+        let body = AssistantModel.adjustBody(proposalID: id, estimates: [("new:0", 60)], fits: [("t", "move_later")], timeZone: Fixture.tz, busy: [])
+        guard case .object(let o) = body else { return XCTFail() }
+        XCTAssertEqual(o["kind"], .string("adjust"))
+        XCTAssertEqual(o["proposal_id"], .string("dddddddd-0000-0000-0000-000000000002"))
+        XCTAssertEqual(o["estimates"], .array([.object(["todo_ref": .string("new:0"), "minutes": .number(60)])]))
+        XCTAssertEqual(o["fits"], .array([.object(["todo_ref": .string("t"), "option": .string("move_later")])]))
+    }
+
+    @MainActor
+    func testAskThenSkipKeepsThirtyMinutesAndSendsNothing() async {
+        let backend = StubBackend()
+        backend.streamEvents = [Fixture.sse("proposal", askJSON)]
+        let consent = MemoryConsent(); consent.hasConsented = true
+        let model = AssistantModel(kind: .planDay, today: Fixture.makeModel(backend: backend), consent: consent)
+        model.send()
+        await model.waitUntilDone()
+        XCTAssertEqual(model.pendingAsks, ["new:0"])
+        XCTAssertNotNil(model.askDeadline)
+        backend.lastStreamBody = nil
+        model.skipEstimate("new:0")
+        XCTAssertEqual(model.pendingAsks, [])
+        XCTAssertNil(model.askDeadline)
+        XCTAssertNil(backend.lastStreamBody, "건너뛰면 서버에 아무것도 보내지 않는다")
+        XCTAssertEqual(model.envelope?.proposal.blocks.first?.end, "2026-11-23T21:30:00+09:00")
+    }
+
+    @MainActor
+    func testTimeoutEndsAsking() async {
+        let backend = StubBackend()
+        backend.streamEvents = [Fixture.sse("proposal", askJSON)]
+        let consent = MemoryConsent(); consent.hasConsented = true
+        let model = AssistantModel(kind: .planDay, today: Fixture.makeModel(backend: backend), consent: consent)
+        model.send()
+        await model.waitUntilDone()
+        model.expireAsks()
+        XCTAssertEqual(model.pendingAsks, [])
+        XCTAssertEqual(model.phase, .proposal)
+    }
+
+    @MainActor
+    func testAnswerReplacesProposal() async {
+        let backend = StubBackend()
+        backend.streamEvents = [Fixture.sse("proposal", askJSON)]
+        let consent = MemoryConsent(); consent.hasConsented = true
+        let model = AssistantModel(kind: .planDay, today: Fixture.makeModel(backend: backend), consent: consent)
+        model.send()
+        await model.waitUntilDone()
+        backend.streamEvents = [Fixture.sse("proposal", adjustedJSON)]
+        await model.answerEstimate("new:0", minutes: 60)
+        guard case .object(let o)? = backend.lastStreamBody else { return XCTFail() }
+        XCTAssertEqual(o["kind"], .string("adjust"))
+        XCTAssertEqual(model.envelope?.proposalId, UUID(uuidString: "dddddddd-0000-0000-0000-000000000003"))
+        XCTAssertEqual(model.envelope?.proposal.blocks.first?.end, "2026-11-23T22:00:00+09:00")
+        XCTAssertEqual(model.pendingAsks, [])
+    }
+
+    @MainActor
+    func testSkipFitHidesCheckWithoutRequest() async {
+        let backend = StubBackend()
+        backend.streamEvents = [Fixture.sse("proposal", askJSON)]
+        let consent = MemoryConsent(); consent.hasConsented = true
+        let model = AssistantModel(kind: .planDay, today: Fixture.makeModel(backend: backend), consent: consent)
+        model.send()
+        await model.waitUntilDone()
+        XCTAssertEqual(model.fitChecks.count, 1)
+        backend.lastStreamBody = nil
+        await model.chooseFit(Fixture.todoA.uuidString, option: "skip")
+        XCTAssertNil(backend.lastStreamBody)
+    }
+}

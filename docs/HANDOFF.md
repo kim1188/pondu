@@ -101,3 +101,12 @@
 - `PROGRESS.md`: 통합 관문 G4(iOS 첫 빌드), G5(실제 서버 연결), 사전 검증 3줄, 배포 기록.
 - 고친 내용은 기능 단위로 나눠 올리고, 본문에 "직접 확인한 방법"과 "확인하지 못한 것"을 적는다.
 - 계약(`docs/specs/CONTRACT.md`)과 다르게 고쳐야 했던 곳은 계약도 같이 고친다.
+
+## 2026-11-23 추가: 예상 시간 묻기와 가용 시간
+
+실제 환경에 반영하려면 두 가지가 필요하다.
+
+1. 마이그레이션 `supabase/migrations/20261123090000_proposal_adjust.sql` 적용(읽기 함수 하나).
+2. Edge Function `assistant` 다시 배포(`_shared/core/availability.mjs`가 새로 들어간다).
+
+앱 쪽 변경(`ios/PonduKit/Sources/FeatureToday/AssistantModel.swift`, `AssistantView.swift`)은 Mac에서 빌드와 `xcodebuild test`로 확인해야 한다. Linux에서는 컴파일하지 못했다.

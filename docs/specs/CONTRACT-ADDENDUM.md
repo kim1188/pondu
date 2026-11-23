@@ -112,3 +112,22 @@
 | `update_session_share`에서 `p_group_id`를 안 줄 때 | 지금 묶인 크루가 유효하면 유지 | 제목만 고쳐도 크루가 풀리거나 오류가 나면 안 된다 |
 | FeedCard `group_id`·`group_name` | 구성원에게만 채움 | 친구에게 크루 이름이 새지 않게 |
 | `rotate_invite_code`의 비운영자 | 구성원이든 아니든 모두 `forbidden` | `remove_crew_member`와 같은 기준 |
+
+## 보정 3 (2026-11-23): 예상 시간 묻기와 가용 시간
+
+제품 결정(사용자): 예상 시간이 없는 일은 물어보고 2분 동안 답이 없거나 건너뛰면 30분으로 잡는다. 다 들어가지 않는 일은 비서가 가용 시간을 확인해 준다.
+
+구현하면서 정한 것: 2분을 기다린 뒤에 계획을 보여 주지 않는다. 30분으로 잡은 계획을 바로 보여 주고 그 위에서 2분 동안 묻는다. 결과는 같고(답이 없으면 30분) 기다리는 시간이 없다.
+
+| 항목 | 계약 |
+|---|---|
+| 제안 형식 | `estimate_asks: string[]` 추가(필수). 30분으로 잡아 둔 일의 `todo_ref`. 없는 필드로 온 예전 응답은 빈 배열로 읽는다 |
+| 모델 규칙 | 예상 시간이 없는 일은 30분 블록 + `estimate_asks`. 한 가지 일의 블록 합은 예상 시간(보정값) 이상. 다 들어가지 않으면 `unscheduled` |
+| `proposal` 이벤트 | `availability` 추가: `{today: {free_minutes, largest_minutes, slots[]}, fit_checks[]}`. 받아 적기(`capture`)는 `null` |
+| `fit_checks[]` | `{todo_ref, needed_minutes, largest_today_minutes, largest_before_due_minutes, fits_within_days, options[], partial_slot, full_slot}`. `options`는 `partial_today`, `move_later`, `place_today`, `skip` 중 고를 수 있는 것 |
+| `kind: "availability"` | 모델 없음, 한도 없음. `availability` 이벤트 하나 |
+| `kind: "adjust"` | 요청 `{proposal_id, estimates: [{todo_ref, minutes 10..240}], fits: [{todo_ref, option}], busy, tz}`. 모델 없음, 한도 없음. 저장된 제안을 고쳐 **새 제안**으로 저장하고 `proposal` 이벤트(`replaces`, `estimate_updates`, `rejected` 추가)를 준다. 원래 제안은 그대로 만료된다 |
+| 이미 있는 할 일의 예상 시간 | 서버는 `estimate_updates: [{todo_id, minutes}]`로 알려 주기만 한다. 앱이 제안을 적용한 뒤 `update_todo`로 저장한다(비서가 할 일을 직접 고치지 않는다는 원칙 유지) |
+| 건너뛰기·시간 초과 | 앱에서 끝난다. 서버 호출 없음. 블록은 30분, 할 일의 예상 시간은 비어 있는 채로 둔다(보정 통계를 오염시키지 않는다) |
+| DB | `assistant_proposal_get(p_user, p_id)` 추가(service_role 전용, 읽기). 내 것, 적용 전, 24시간 안의 제안만 |
+| 알림 | 묻는 중에 앱을 떠나면 로컬 알림 한 번. 답은 앱 안에서 고른다(알림 버튼으로 답하기는 하지 않았다) |

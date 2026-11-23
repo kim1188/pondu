@@ -15,6 +15,16 @@ begin
   assert i = '{"kind":"capture","now":"2026-11-23T00:00:00Z"}'::jsonb, format('input에 원문이 남음: %s', i);
   assert (select applied_at is null and user_id = a from assistant_proposals where id = pid), '저장 상태가 이상함';
 
+  -- 읽기: 내 것, 적용 전, 24시간 안의 제안만 나온다.
+  assert assistant_proposal_get(a, pid)->>'kind' = 'capture', '저장한 제안을 읽지 못함';
+  assert assistant_proposal_get(a, pid)->'proposal'->>'message' = 'm', '제안 내용이 다름';
+  assert assistant_proposal_get(gen_random_uuid(), pid) is null, '남의 제안이 읽힘';
+  update assistant_proposals set created_at = now() - interval '25 hours' where id = pid;
+  assert assistant_proposal_get(a, pid) is null, '만료된 제안이 읽힘';
+  update assistant_proposals set created_at = now(), applied_at = now() where id = pid;
+  assert assistant_proposal_get(a, pid) is null, '적용한 제안이 읽힘';
+  update assistant_proposals set applied_at = null where id = pid;
+
   begin
     perform assistant_proposal_save(a, 'chat', '{}'::jsonb, '{"todos":[],"blocks":[]}'::jsonb);
     raise exception '잘못된 kind가 통과함';
