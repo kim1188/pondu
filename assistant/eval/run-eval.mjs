@@ -160,9 +160,11 @@ const MOCK = process.env.ASSISTANT_EVAL_MOCK;
 //   그 밖(OpenAI 채팅 모델)        providers/openai.mjs. ASSISTANT_HARNESS=decide 면 채팅 모델에게 고르기 방식으로 묻는다
 // 고르기 방식은 글을 쓰지 못해 capture 를 다루지 않으므로, 그 경로에서는 배치 사례(plan_day, reschedule)만 돌린다.
 const DECISION_MODEL = /luna|jev|clef/i;
+// ASSISTANT_HARNESS=chat 이면 이름에 luna 가 들어간 모델도 채팅 모델로 부른다(같은 모델을 두 방식으로 재 볼 때).
 const routeOf = model => (/^claude/i.test(model) ? 'anthropic'
-  : DECISION_MODEL.test(model) ? 'decisions'
-  : process.env.ASSISTANT_HARNESS === 'decide' ? 'chat-decide' : 'openai');
+  : process.env.ASSISTANT_HARNESS === 'chat' ? 'openai'
+  : process.env.ASSISTANT_HARNESS === 'decide' && !DECISION_MODEL.test(model) ? 'chat-decide'
+  : DECISION_MODEL.test(model) ? 'decisions' : 'openai');
 const cliModel = (() => { const i = process.argv.indexOf('--model'); return i > 0 ? process.argv[i + 1] : undefined; })();
 const DECIDING = cliModel ? ['decisions', 'chat-decide'].includes(routeOf(cliModel)) : false;
 
@@ -196,7 +198,9 @@ async function runCase(c, ctx) {
     }
   }
   // 결정 모델은 출력 토큰이 0이다. 입력 토큰이라도 있어야 실제 응답으로 본다.
-  if (!MOCK && !((r.usage?.output_tokens ?? 0) + (r.usage?.input_tokens ?? 0) > 0)) throw new Error('usage 가 비어 있음: 응답을 믿을 수 없어 채점하지 않음');
+  // 고르기 방식에서 물을 것이 하나도 없던 사례(할 일이 없음, 놓을 자리가 없음)는 모델을 부르지 않는다.
+  const askedNothing = r.usage?.requests === 0;
+  if (!MOCK && !askedNothing && !((r.usage?.output_tokens ?? 0) + (r.usage?.input_tokens ?? 0) > 0)) throw new Error('usage 가 비어 있음: 응답을 믿을 수 없어 채점하지 않음');
   return {
     output: r.proposal, // 거절했거나 형식이 깨졌으면 null → 채점기가 0점 처리하고 이유를 남긴다
     refused: r.stop_reason === 'refusal',

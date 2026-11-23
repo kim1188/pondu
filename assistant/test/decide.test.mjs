@@ -65,6 +65,24 @@ test('허용하지 않은 선택이나 빠진 답은 그 단계에서 멈춘다'
   await assert.rejects(run(m, async () => ({ answers: {} })), /답하지 않음/);
 });
 
+test('모든 질문은 선택지가 2개 이상이다(자리가 없는 일은 묻지 않고 넘긴다)', async () => {
+  let asked = 0;
+  for (const c of SCHEDULING) {
+    const r = await proposeByDeciding(c.input, { decider: async req => {
+      for (const q of Object.values(req.questions)) if (q.type === 'choice') { asked++; assert.ok(q.choices.length >= 2, `${c.id}: 선택지 ${q.choices.length}개`); }
+      return fakeDecider()(req);
+    } });
+    assert.ok(r.proposal, c.id);
+  }
+  assert.ok(asked > 20);
+  // 시간이 모자란 사례: 못 넣은 일은 모델에 묻지 않고도 unscheduled 에 들어간다
+  const p07 = await proposeByDeciding(CASES.find(x => x.id === 'p07').input, { decider: fakeDecider() });
+  assert.ok(p07.proposal.unscheduled.length >= 1);
+  // 할 일이 없으면 모델을 부르지 않는다
+  const p06 = await proposeByDeciding(CASES.find(x => x.id === 'p06').input, { decider: async () => { throw new Error('부르면 안 됨'); } });
+  assert.equal(p06.usage.requests, 0);
+});
+
 test('capture 는 이 도메인이 다루지 않는다', () => {
   assert.throws(() => scheduleMachine(CASES.find(x => x.id === 'c01').input), /다루지 않음/);
 });
