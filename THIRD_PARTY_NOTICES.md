@@ -6,9 +6,9 @@
 
 | 이름 | 쓰는 곳 | 라이선스 | 출처 |
 |---|---|---|---|
-| `@anthropic-ai/sdk` | `assistant/`, `supabase/functions/` | MIT | https://github.com/anthropics/anthropic-sdk-typescript |
+| `@anthropic-ai/sdk` | `assistant/`, `supabase/functions/` | Apache-2.0 | https://github.com/anthropics/anthropic-sdk-typescript |
 | `openai` | `assistant/` (시험 세트의 모델 비교용. 서버 함수에는 들어가지 않는다) | Apache-2.0 | https://github.com/openai/openai-node |
-| `supabase-swift` | `ios/PonduKit` | MIT | https://github.com/supabase/supabase-swift |
+| `supabase-swift` | `ios/PonduKit` | MIT (저장소의 LICENSE로 다시 확인할 것) | https://github.com/supabase/supabase-swift |
 
 ## 설계를 참고한 것
 
