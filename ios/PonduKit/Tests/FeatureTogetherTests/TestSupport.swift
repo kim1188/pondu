@@ -79,10 +79,10 @@ final class FakeBackend: Backend, @unchecked Sendable {
     func calls(named name: String) -> [RecordedCall] { calls.filter { $0.name == name } }
 
     private func handle(_ name: String, _ params: [String: JSONValue]) async throws -> Data {
-        lock.lock()
-        recorded.append(RecordedCall(name: name, params: params))
-        let handler = handlers[name]
-        lock.unlock()
+        let handler = lock.withLock {
+            recorded.append(RecordedCall(name: name, params: params))
+            return handlers[name]
+        }
         guard let handler else { throw BackendError(code: "unknown") }
         return try await handler(params)
     }

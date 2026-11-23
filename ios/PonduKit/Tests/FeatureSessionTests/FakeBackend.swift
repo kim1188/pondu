@@ -52,8 +52,9 @@ final class StubBackend: Backend, @unchecked Sendable {
     }
 
     func rpcVoid(_ name: String, _ params: [String: JSONValue]) async throws {
-        lock.lock(); defer { lock.unlock() }
-        calls.append(Call(name: name, params: params))
+        lock.withLock {
+            calls.append(Call(name: name, params: params))
+        }
     }
 
     func call<T: Decodable>(function: String, body: JSONValue) async throws -> T { throw BackendError(code: "unknown") }
@@ -62,8 +63,9 @@ final class StubBackend: Backend, @unchecked Sendable {
     }
     func upload(path: String, fileURL: URL, contentType: String) async throws {
         if let e = uploadError { throw e }
-        lock.lock(); defer { lock.unlock() }
-        uploads.append((path, contentType))
+        lock.withLock {
+            uploads.append((path, contentType))
+        }
     }
     func signedURL(path: String) async throws -> URL { URL(string: "https://example.invalid/\(path)")! }
 

@@ -348,7 +348,7 @@ final class AssistantModel {
                 for try await ev in stream {
                     AssistantStream.reduce(&local, event: ev)
                     let snapshot = local
-                    await self?.publish(snapshot)
+                    self?.publish(snapshot)
                 }
             } catch {
                 if !(error is CancellationError) { local.errorCode = (error as? BackendError)?.code ?? "unknown" }
@@ -383,8 +383,8 @@ final class AssistantModel {
         phase = .failed(code: timedOut ? "timeout" : "assistant_unavailable")
     }
 
-    static func requestBody(kind: AssistantKind, text: String, now: Date, timeZone: TimeZone,
-                            busy: [BusyInterval], session: SessionEndSignal?) -> JSONValue {
+    nonisolated static func requestBody(kind: AssistantKind, text: String, now: Date, timeZone: TimeZone,
+                                        busy: [BusyInterval], session: SessionEndSignal?) -> JSONValue {
         .object([
             "kind": .string(kind.rawValue),
             "text": .string(text),
@@ -454,8 +454,8 @@ final class AssistantModel {
     /// 화면에 보여 줄 점검: 건너뛴 것은 뺀다.
     var fitChecks: [FitCheck] { (envelope?.availability?.fitChecks ?? []).filter { !skippedFits.contains($0.todoRef) } }
 
-    static func adjustBody(proposalID: UUID, estimates: [(String, Int)], fits: [(String, String)],
-                           timeZone: TimeZone, busy: [BusyInterval]) -> JSONValue {
+    nonisolated static func adjustBody(proposalID: UUID, estimates: [(String, Int)], fits: [(String, String)],
+                                       timeZone: TimeZone, busy: [BusyInterval]) -> JSONValue {
         .object([
             "kind": .string("adjust"),
             "proposal_id": .uuid(proposalID),

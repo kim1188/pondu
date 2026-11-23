@@ -248,12 +248,13 @@ final class SessionControllerTests: XCTestCase {
         await c.waitForStart()
         await c.cancelFlush()
         XCTAssertEqual(store.load().starts.count, 1)
+        let attemptsBeforeExpiry = backend.count("start_session")
 
         clock.date = clock.date.addingTimeInterval(13 * 3600)
         backend.on("start_session", .json(Fixture.session()))
         c.retryPending()
         await c.waitUntilIdle()
-        XCTAssertEqual(backend.count("start_session"), 1)   // 12시간이 지난 건 보내지 않는다
+        XCTAssertEqual(backend.count("start_session"), attemptsBeforeExpiry)   // 12시간이 지난 건 보내지 않는다
         XCTAssertNil(c.live)
         XCTAssertTrue(store.load().starts.isEmpty)
         XCTAssertNotNil(c.alert)

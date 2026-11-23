@@ -60,12 +60,15 @@ public final class AuthStore {
     }
 
     public func refreshProfile() async {
-        guard auth.currentUserID != nil else {
-            state = .signedOut
+        guard !Task.isCancelled else { return }
+        guard let userID = auth.currentUserID else {
+            await finishSignOut()
             return
         }
         do {
             let fetched: Profile? = try await backend.rpc("get_my_profile", [:])
+            try Task.checkCancellation()
+            guard auth.currentUserID == userID else { return }
             lastError = nil
             if let fetched {
                 cache.save(fetched)
@@ -80,6 +83,7 @@ public final class AuthStore {
         } catch is CancellationError {
             return
         } catch {
+            guard !Task.isCancelled, auth.currentUserID == userID else { return }
             let backendError = (error as? BackendError) ?? .unknown
             lastError = backendError
             if backendError == .notAuthenticated {
@@ -123,6 +127,7 @@ public final class AuthStore {
         cache.clear()
         profile = nil
         isShowingCachedProfile = false
+        lastError = nil
         state = .signedOut
         onSignedOut()
         NotificationCenter.default.post(name: .ponduDidSignOut, object: nil)

@@ -109,10 +109,10 @@ enum Fixture {
 
     @MainActor
     static func makeModel(backend: StubBackend = StubBackend(), store: MemoryStore = MemoryStore(), calendar: FakeCalendar = FakeCalendar(),
-                          notifier: FakeNotifier = FakeNotifier(), sessions: FakeSessions = FakeSessions()) -> TodayModel {
+                          notifier: FakeNotifier = FakeNotifier(), sessions: FakeSessions? = nil) -> TodayModel {
         backend.responses["get_today"] = backend.responses["get_today"] ?? todayJSON
         let n = now
-        return TodayModel(backend: backend, sessions: sessions, now: { n }, timeZone: tz, store: store, calendar: calendar, notifier: notifier)
+        return TodayModel(backend: backend, sessions: sessions ?? FakeSessions(), now: { n }, timeZone: tz, store: store, calendar: calendar, notifier: notifier)
     }
 
     static func event(_ title: String, _ s: String, _ e: String, allDay: Bool = false, free: Bool = false) -> CalendarEventLite {

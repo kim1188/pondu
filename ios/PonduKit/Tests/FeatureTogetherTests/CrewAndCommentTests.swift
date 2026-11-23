@@ -4,7 +4,7 @@ import PonduCore
 
 @MainActor
 final class CrewAndCommentTests: XCTestCase {
-    private static func crewJSON(id: UUID = UUID(), name: String = "스터디", role: String = "owner") -> [String: Any] {
+    nonisolated private static func crewJSON(id: UUID = UUID(), name: String = "스터디", role: String = "owner") -> [String: Any] {
         ["id": id.uuidString.lowercased(), "name": name, "invite_code": "ABCD1234", "member_count": 3, "role": role]
     }
 

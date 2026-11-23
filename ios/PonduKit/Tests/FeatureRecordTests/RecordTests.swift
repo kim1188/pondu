@@ -14,9 +14,9 @@ final class HeatmapTests: XCTestCase {
     }
 
     func testRangeStartsOnMondayWeeksBack() {
-        // 2026-11-22는 일요일
+        // 2026-11-22는 일요일. 이번 주는 월요일인 11-16에 시작한다.
         let r = Heatmap.range(today: date(2026, 11, 22), weeks: 4, calendar: cal)
-        XCTAssertEqual(Heatmap.dayString(r.from, calendar: cal), "2026-11-02")   // 3주 전 월요일
+        XCTAssertEqual(Heatmap.dayString(r.from, calendar: cal), "2026-10-26")   // 3주 전 월요일
         XCTAssertEqual(Heatmap.dayString(r.to, calendar: cal), "2026-11-22")
     }
 
