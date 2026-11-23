@@ -36,6 +36,48 @@ final class CodecTests: XCTestCase {
         XCTAssertEqual(session.recordBadges, ["앱 촬영 첨부", "나중에 정정함", "오프라인 시작"])
     }
 
+    func testSessionWithNullDurationAndGroupID() throws {
+        // needs_confirmation 세션은 duration_seconds가 null이고(계약 보정 R13), 크루 공개 세션에는 group_id가 있다.
+        let json = sessionJSON
+            .replacingOccurrences(of: "\"duration_seconds\": 125", with: "\"duration_seconds\": null")
+            .replacingOccurrences(of: "\"end_corrected\": true,", with: "\"end_corrected\": true, \"group_id\": \"33333333-3333-3333-3333-333333333333\",")
+        let session = try PonduJSON.makeDecoder().decode(SessionDTO.self, from: Data(json.utf8))
+        XCTAssertEqual(session.durationSeconds, 0)
+        XCTAssertEqual(session.groupId, UUID(uuidString: "33333333-3333-3333-3333-333333333333"))
+        let withoutGroup = try PonduJSON.makeDecoder().decode(SessionDTO.self, from: Data(sessionJSON.utf8))
+        XCTAssertNil(withoutGroup.groupId)
+    }
+
+    func testFeedCardGroupFieldsAndTitleFallback() throws {
+        let json = """
+        [{
+          "session_id": "11111111-1111-1111-1111-111111111111",
+          "author": {"id": "22222222-2222-2222-2222-222222222222", "handle": "kim", "display_name": "김", "avatar_path": null, "department_name": null},
+          "thread_id": null, "share_title": null, "primary_category": "coding",
+          "started_at": "2026-11-22T10:15:30Z", "ended_at": null, "status": "live", "duration_seconds": 10,
+          "progress_note": null, "photo_path": null, "photo_thumb_path": null, "capture_mode": "no_photo",
+          "end_corrected": false, "offline_started": false, "joined_with": null,
+          "reaction_count": 0, "my_reaction": null, "comment_count": 0,
+          "group_id": "33333333-3333-3333-3333-333333333333", "group_name": "스터디"
+        }]
+        """
+        let cards = try PonduJSON.makeDecoder().decode([FeedCardDTO].self, from: Data(json.utf8))
+        XCTAssertEqual(cards[0].groupName, "스터디")
+        XCTAssertEqual(cards[0].groupId, UUID(uuidString: "33333333-3333-3333-3333-333333333333"))
+        XCTAssertEqual(cards[0].displayTitle, "코딩")          // share_title이 null이면 분야 이름
+        var titled = cards[0]
+        titled.shareTitle = "로그인 문제"
+        XCTAssertEqual(titled.displayTitle, "로그인 문제")
+        titled.shareTitle = "  "
+        XCTAssertEqual(titled.displayTitle, "코딩")
+    }
+
+    func testThreadDefaultGroupID() throws {
+        let json = #"{"id": "11111111-1111-1111-1111-111111111111", "title": "과제", "share_title": null, "primary_category": "study", "default_visibility": "crew", "archived_at": null, "default_group_id": "33333333-3333-3333-3333-333333333333"}"#
+        let thread = try PonduJSON.makeDecoder().decode(ThreadDTO.self, from: Data(json.utf8))
+        XCTAssertEqual(thread.defaultGroupId, UUID(uuidString: "33333333-3333-3333-3333-333333333333"))
+    }
+
     func testPageOfFeedCards() throws {
         let json = """
         {"items": [{

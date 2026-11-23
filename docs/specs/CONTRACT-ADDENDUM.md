@@ -48,3 +48,67 @@
 
 - 크루 공개 세션은 지금 내가 속한 모든 크루에 보인다. 크루별로 나누려면 세션에 크루 id 열이 필요하다.
 - 세션 주인이 자기 카드에 달린 남의 한마디를 지울 수 있게 할지.
+
+## 보정 2 (2026-11-22)
+
+보정 1의 "제품 결정이 필요한 것" 두 건이 정해졌고, 보정 1 중 코드에 아직 없던 항목(S8, S9의 재요청 제한, S10, S11, R8)을 반영했다. 이 절과 `CONTRACT.md`·보정 1이 다르면 이 절이 우선한다. iOS는 이 절에 맞춘다.
+
+확인 수준: `[로컬]` 일반 Postgres 16에서 `supabase/tests/run.sh`로 실행해 통과. 실기기·Supabase 운영 환경 확인은 하지 않았다.
+
+### 제품 결정
+
+| 결정 | 내용 |
+|---|---|
+| 크루를 골라서 공개 | `crew` 공개 세션은 세션마다 크루 하나(`group_id`)에 묶인다. 작성자와 친구이거나, 보는 사람과 작성자가 둘 다 그 크루의 활동 중인 구성원이면 보인다. |
+| 한마디 삭제 | 세션 주인이 자기 카드에 달린 남의 한마디를 지울 수 없다(`delete_comment`는 쓴 사람만, 그 밖은 `forbidden`). 바뀐 것 없음. 테스트 추가. |
+
+### 바뀐 함수 인자
+
+새 인자는 모두 맨 끝에 `default null`로 붙였다. 기존 호출은 그대로 동작한다.
+
+| 함수 | 새 인자 | 규칙 |
+|---|---|---|
+| `start_session` | `p_group_id uuid default null` | 공개 범위가 `crew`일 때만 쓴다. (1) `p_group_id`가 있으면 호출자가 그 크루의 활동 중인 구성원이어야 하고 아니면 `not_found`. (2) 없으면 이어가는 일의 `default_group_id`(호출자가 아직 구성원일 때). (3) 그것도 없고 호출자가 속한 크루가 정확히 하나면 그 크루. (4) 그 밖에는 `invalid_input`. `crew`가 아닌 공개 범위에서는 `p_group_id`를 무시하고 `group_id`는 null. |
+| `update_session_share` | `p_group_id uuid default null` | `start_session`과 같은 규칙. 단 `p_group_id`가 없으면 지금 묶인 크루가 아직 유효할 때 그것을 먼저 유지한다. 공개 범위를 `crew`가 아닌 값으로 바꾸면 `group_id`는 null. `p_visibility`가 null이면 지금 공개 범위로 판단한다. |
+| `create_thread` | `p_default_group_id uuid default null` | 호출자가 활동 중인 구성원인 크루만. 아니면 `not_found`. |
+| `update_thread` | patch 키 `default_group_id` | uuid 문자열 또는 null(지움). 구성원이 아닌 크루면 `not_found`, 다른 형식이면 `invalid_input`. |
+| `get_feed` | (인자 없음, 동작 변경) | `p_group_id`가 있으면 `group_id`가 그 크루인 `crew` 공개 세션만(작성자가 지금도 그 크루 구성원일 때). 기본 피드에서 친구가 아닌 크루원의 `crew` 세션은 내가 그 세션의 크루 구성원일 때만 나온다. 친구의 `crew` 세션은 크루와 상관없이 나온다. |
+| `get_thread_history` | (동작 변경) | 각 세션을 `can_view_session`으로 거른다. |
+| `apply_proposal` | (동작 변경) | 아래 "새 규칙". |
+| `import_todos` | 항목 키 추가 | 아래 "새 규칙". |
+| `send_friend_request` | (동작 변경) | 아래 "새 규칙". |
+
+### 새 함수
+
+| 함수 | 인자 | 반환 | 규칙 |
+|---|---|---|---|
+| `rotate_invite_code` | `p_group_id uuid` | Crew(새 `invite_code` 포함) | 크루 운영자(`role = owner`)만. 운영자가 아니거나(구성원 아님, 없는 크루 포함) 아니면 `forbidden`, `p_group_id`가 null이면 `invalid_input`. 새 코드는 16자 무작위이고 예전 코드는 즉시 `invite_invalid`. 이미 들어온 구성원은 그대로이고, 내보낸 사람은 새 코드로도 `forbidden`(보정 1 S8). |
+
+### JSON 필드
+
+| 모양 | 추가·변경 | 비고 |
+|---|---|---|
+| Session | `group_id` (uuid 또는 null) | `visibility`가 `crew`일 때만 값이 있다. 크루가 사라지면(`on delete set null`) null이 될 수 있다. |
+| Thread | `default_group_id` (uuid 또는 null) | |
+| FeedCard | `group_id`, `group_name` (uuid·text 또는 null) | **보는 사람이 그 크루의 활동 중인 구성원일 때만** 채운다. 구성원이 아닌 친구에게는 크루 이름이 드러나지 않도록 null. |
+| FeedCard | `share_title` | 세션에 공유 제목이 없으면 **JSON null**. 앱이 분야 이름(`primary_category`의 표시 이름)으로 채운다(R8). `CONTRACT.md` 3절의 "분야 이름으로 대신한다"는 이 절로 대체. |
+
+### 새 규칙
+
+| 규칙 | 내용 | 오류 |
+|---|---|---|
+| 친구 요청 재요청 제한 | 상대가 내 요청을 거절(`respond_friend_request(p_accept = false)`)하면 같은 상대에게 7일 동안 다시 `send_friend_request`를 못 한다. 7일이 지나면 가능. 거절한 사람이 먼저 보내는 요청은 막지 않고, 서로 친구가 되면 기록은 지워진다. 기록은 새 표 `friend_request_rejections`(앱이 직접 접근 불가). | `rate_limited` |
+| 차단과 친구 요청 | 내가 상대를 차단했으면 `blocked`. 상대가 나를 차단했으면 요청도 알림도 만들지 않고 **성공(null)**을 돌려준다. 차단당한 사실이 드러나지 않게 하려는 것이다. 앱은 성공으로 보이는 "요청 보냄" 상태를 보여 주되 `list_friend_requests`에는 나타나지 않는다. | `blocked`(내가 차단한 경우만) |
+| 재배치 전부 적용 | 제안의 `kind`가 `reschedule`이면 `p_block_indexes`는 null(전부) 또는 블록 전체(`0..n-1`, 순서·중복 무관)여야 한다. 일부만 고르면 거절하고 제안은 소비되지 않는다. `p_todo_indexes`와 다른 `kind`는 전과 같다(null이면 전부). | `invalid_input` |
+| 제안 유효 기간 | 만든 지 24시간이 지난 제안은 적용할 수 없다. 이미 적용한 제안의 재적용은 기간과 상관없이 `proposal_already_applied`. | `proposal_not_found` |
+| 가져오기 기한 | `import_todos` 항목은 `due_at`(+`due_has_time`) 대신 `due_date`(`YYYY-MM-DD`)와 `due_time`(`HH:MM` 또는 null)을 줄 수 있다. 한국 시간 기준이고 `apply_proposal`과 같은 변환을 쓴다. 시각이 없으면 그날 23:59 KST와 `due_has_time = false`. `due_at` 방식도 계속 받는다. 한 항목에 둘을 같이 주거나(`due_date`와 `due_at`), `due_time`만 주거나, 형식이 틀리면 거절. | `invalid_input` |
+| 크루 가시성 | `can_view_session`: `crew` 공개 세션은 (작성자와 친구) 또는 (보는 사람과 작성자가 둘 다 그 세션의 `group_id` 크루의 활동 중인 구성원). `group_id`가 null인 `crew` 세션(크루가 사라진 경우)은 친구만. 차단·신고·`needs_confirmation` 규칙은 그대로. 크루에서 나가거나 내보내지면 그 크루로 묶인 세션은 그 크루원에게 곧바로 안 보인다. | |
+
+### 계약 문서와 다르게 정한 것
+
+| 항목 | 정한 것 | 이유 |
+|---|---|---|
+| 이어가는 일의 기본 크루가 더는 유효하지 않을 때 | 에러 없이 다음 규칙(크루가 하나면 그 크루, 아니면 `invalid_input`)으로 넘어간다 | 크루를 나간 뒤 기본값 때문에 세션을 못 시작하면 안 된다 |
+| `update_session_share`에서 `p_group_id`를 안 줄 때 | 지금 묶인 크루가 유효하면 유지 | 제목만 고쳐도 크루가 풀리거나 오류가 나면 안 된다 |
+| FeedCard `group_id`·`group_name` | 구성원에게만 채움 | 친구에게 크루 이름이 새지 않게 |
+| `rotate_invite_code`의 비운영자 | 구성원이든 아니든 모두 `forbidden` | `remove_crew_member`와 같은 기준 |

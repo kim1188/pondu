@@ -209,6 +209,23 @@ final class FeedModelTests: XCTestCase {
         XCTAssertEqual(model.items.map { model.canJoin($0) }, [true, false, false])
     }
 
+    // MARK: 크루 이름과 제목 대신 쓰는 분야 이름
+
+    func testCardKeepsGroupNameAndFallsBackToCategoryTitle() async {
+        let backend = FakeBackend()
+        backend.on("list_my_crews") { _ in Fixtures.json([]) }
+        backend.on("get_feed") { _ in
+            Fixtures.page([Fixtures.card(shareTitle: nil, groupName: "스터디"), Fixtures.card()], next: nil)
+        }
+        let model = FeedModel(backend: backend)
+        await model.reload()
+
+        XCTAssertEqual(model.items[0].card.groupName, "스터디")
+        XCTAssertEqual(model.items[0].card.displayTitle, "공부")     // share_title이 null이면 분야 이름
+        XCTAssertNil(model.items[1].card.groupName)
+        XCTAssertEqual(model.items[1].card.displayTitle, "DB 과제")
+    }
+
     // MARK: 문구
 
     func testMethodLabelsNeverSayCertification() {

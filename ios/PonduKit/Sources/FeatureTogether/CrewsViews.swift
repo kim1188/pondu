@@ -17,7 +17,7 @@ struct CrewsView: View {
             case .loading:
                 ForEach(0..<3, id: \.self) { _ in Text("크루 이름 자리") }.skeleton(true)
             case .failed:
-                TogetherRetryView(message: "크루를 불러오지 못했어요.") { Task { await model.load() } }
+                ErrorRetryView(message: "크루를 불러오지 못했어요.") { Task { await model.load() } }
             case .ready:
                 if model.crews.isEmpty {
                     VStack(spacing: 8) {
@@ -108,7 +108,7 @@ struct CrewDetailView: View {
                 case .loading:
                     ForEach(0..<3, id: \.self) { _ in PersonRowPlaceholder() }.skeleton(true)
                 case .failed:
-                    TogetherRetryView(message: "구성원을 불러오지 못했어요.") { Task { await members.load() } }
+                    ErrorRetryView(message: "구성원을 불러오지 못했어요.") { Task { await members.load() } }
                 case .ready:
                     ForEach(members.members) { m in
                         HStack(spacing: 12) {

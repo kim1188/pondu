@@ -332,7 +332,7 @@ final class SessionControllerTests: XCTestCase {
 
     func testNeedsConfirmationOpensConfirmScreenAndConfirms() async {
         let c = makeController()
-        backend.on("get_my_live_session", .json(Fixture.session(status: "needs_confirmation", category: "study", duration: 20_000)))
+        backend.on("get_my_live_session", .json(Fixture.session(status: "needs_confirmation", category: "study", duration: nil)))
         await c.refresh()
         XCTAssertEqual(c.live?.phase, .needsConfirmation)
         XCTAssertEqual(c.route, .confirmEnd)
@@ -377,5 +377,85 @@ final class SessionControllerTests: XCTestCase {
         XCTAssertNil(c.live)
         XCTAssertEqual(c.route, .start)
     }
-}
+    // MARK: 크루 고르기 (공개 대상이 크루일 때)
 
+    private static let crewA = "cccccccc-0000-0000-0000-00000000000a"
+    private static let crewB = "cccccccc-0000-0000-0000-00000000000b"
+
+    private func crewJSON(_ id: String, _ name: String) -> [String: Any] {
+        ["id": id, "name": name, "invite_code": "ABCD1234", "member_count": 3, "role": "member"]
+    }
+
+    private func openStart(_ c: SessionController, crews: [[String: Any]]) async {
+        backend.on("list_threads", .json([Any]()))
+        backend.on("list_my_crews", .json(crews))
+        c.presentStart(startRequest())
+        c.draft?.category = "study"
+        await c.draft?.loadCrews(using: backend)
+    }
+
+    func testSingleCrewIsChosenAutomaticallyAndSentAsGroupID() async {
+        let c = makeController()
+        backend.on("start_session", .json(Fixture.session()))
+        await openStart(c, crews: [crewJSON(Self.crewA, "스터디")])
+        c.draft?.visibility = .crew
+        XCTAssertEqual(c.draft?.resolvedGroupID, UUID(uuidString: Self.crewA))
+        XCTAssertEqual(c.draft?.canStart, true)
+        c.commitStart()
+        await c.waitUntilIdle()
+        let p = backend.lastParams("start_session")!
+        XCTAssertEqual(p["p_visibility"], .string("crew"))
+        XCTAssertEqual(p["p_group_id"], .string(Self.crewA))
+    }
+
+    func testSeveralCrewsRequireAChoice() async {
+        let c = makeController()
+        backend.on("start_session", .json(Fixture.session()))
+        await openStart(c, crews: [crewJSON(Self.crewA, "스터디"), crewJSON(Self.crewB, "동아리")])
+        c.draft?.visibility = .crew
+        XCTAssertNil(c.draft?.resolvedGroupID)
+        XCTAssertEqual(c.draft?.canStart, false)
+        c.commitStart()
+        XCTAssertNil(c.live)                                // 크루를 고르기 전에는 시작하지 않는다
+        XCTAssertEqual(c.route, .start)
+
+        c.draft?.groupID = UUID(uuidString: Self.crewB)
+        c.commitStart()
+        await c.waitUntilIdle()
+        XCTAssertEqual(backend.lastParams("start_session")?["p_group_id"], .string(Self.crewB))
+    }
+
+    func testNoCrewsHidesCrewChoiceAndNonCrewSendsNullGroupID() async {
+        let c = makeController()
+        backend.on("start_session", .json(Fixture.session()))
+        await openStart(c, crews: [])
+        XCTAssertEqual(c.draft?.availableTargets, [.private, .friends])
+        c.draft?.visibility = .friends
+        c.commitStart()
+        await c.waitUntilIdle()
+        XCTAssertEqual(backend.lastParams("start_session")?["p_group_id"], .null)
+    }
+
+    // MARK: 종료 알림의 todo_id
+
+    func testEndAfterRelaunchUsesTodoIDFromServerSession() async {
+        let c = makeController()
+        let todo = "dddddddd-0000-0000-0000-000000000001"
+        backend.on("get_my_live_session", .json(Fixture.session(todoID: todo)))
+        await c.refresh()                                   // 앱을 껐다 켠 뒤 서버에서 받은 세션
+        XCTAssertEqual(c.live?.todoID, UUID(uuidString: todo))
+
+        backend.on("end_session", .json(Fixture.session(status: "ended", outcome: "done", todoID: todo)))
+        let received = expectation(description: "pondu.session.ended")
+        let todoIDs = Locked<[String]>([])
+        let token = NotificationCenter.default.addObserver(forName: Notification.Name("pondu.session.ended"), object: nil, queue: nil) { note in
+            if let id = note.userInfo?["todo_id"] as? String { todoIDs.withValue { $0.append(id) } }
+            received.fulfill()
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+        c.presentEnd(); c.endDraft.choice = .done; c.commitEnd()
+        await c.waitUntilIdle()
+        await fulfillment(of: [received], timeout: 2)
+        XCTAssertEqual(todoIDs.current, [todo])
+    }
+}

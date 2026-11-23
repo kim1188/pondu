@@ -33,6 +33,15 @@
 - 사진 저장소의 서명 주소 응답 필드와 업로드 경로
 - 서버 함수, 스트리밍, 사진 업로드는 SDK가 아니라 `URLSession`으로 직접 호출한다
 
+**정적 대조에서 의심으로 남은 곳** (컴파일러로 확인할 것)
+
+- `async let`으로 `@MainActor` 메서드를 부르는 곳: `RecordModel.refresh`, `FriendsModel.load`, `FeedModel.reload`
+- 테스트용 가짜 Backend가 async 함수 안에서 `NSLock.lock()`을 직접 부른다
+- `JSONValue`의 정적 함수 `uuid`, `date`, `int`가 `PonduCore`(비옵셔널 인자)와 `FeatureToday`(옵셔널 인자) 두 곳에 있어 오버로드가 모호할 수 있다
+- 이번에 추가된 코드: `SessionDTO`의 `init(from:)`, 세션 시작 화면의 크루 선택(`Picker`의 태그 타입), `AppEnvironment`의 알림 delegate 연결
+- 앱을 완전히 껐다가 예정 시각 알림으로 켜면 시작 화면에 할 일과 예정 시간만 넘어가고 분야·제목이 채워지지 않는다. 실물 기기에서 확인하고 필요하면 `TodayModel`을 거치게 바꾼다
+- 오늘 탭의 "…는 평소 N배 걸려서" 문구에 받침에 따른 조사 처리가 없다
+
 **끝났다고 말할 조건**: 패키지와 앱이 경고가 아닌 오류 없이 빌드되고, 테스트가 통과하고, 시뮬레이터에서 가입 → 프로필 → 홈 → 세션 시작·종료 → 기록 탭에 표시까지 된다. 시뮬레이터 확인은 `[실기기]`가 아니다. `PROGRESS.md`에는 `[로컬]`로 적고, 실물 기기 항목(V2~V10)은 그대로 남긴다.
 
 ## 2. Supabase 프로젝트: 실제 환경 적용

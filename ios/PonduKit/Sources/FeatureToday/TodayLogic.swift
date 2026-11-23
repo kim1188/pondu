@@ -30,10 +30,18 @@ enum TodayLogic {
 
     /// "과제는 평소 1.4배 걸려서 85분으로 잡았어요" — 배수가 1에 가까우면(±5%) 말하지 않는다.
     static func estimateNote(categoryRaw: String?, estimateMin: Int?, factors: [String: Double]) -> String? {
-        guard let raw = categoryRaw, let minutes = estimateMin, let f = factors[raw], abs(f - 1.0) >= 0.05 else { return nil }
-        let name = ActivityCategory(rawValue: raw)?.displayName ?? raw
+        guard let raw = categoryRaw, let minutes = estimateMin, let f = factor(for: raw, in: factors), abs(f - 1.0) >= 0.05 else { return nil }
+        let name = ActivityCategory(serverKey: raw)?.displayName ?? raw
         let factorText = String(format: "%.1f", f)
         return "\(name)는 평소 \(factorText)배 걸려서 \(minutes)분으로 잡았어요"
+    }
+
+    /// 분야 키를 snake_case(`venture_research_intern`)와 camelCase(`ventureResearchIntern`) 어느 쪽으로 저장했어도 찾는다.
+    /// 기기에 저장한 오늘 값은 키 변환 디코더로 다시 읽어서 분야 키가 camelCase로 바뀔 수 있다(계약 보정 R7).
+    static func factor(for categoryRaw: String, in factors: [String: Double]) -> Double? {
+        if let exact = factors[categoryRaw] { return exact }
+        guard let category = ActivityCategory(serverKey: categoryRaw) else { return nil }
+        return factors.first { ActivityCategory(serverKey: $0.key) == category }?.value
     }
 
     static func dayKey(_ date: Date, timeZone: TimeZone) -> String {

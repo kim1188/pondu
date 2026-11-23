@@ -189,7 +189,7 @@ begin
          'end', to_char((e0 + interval '1 hour') at time zone 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI:SS') || '+09:00'))))
   returning id into p;
   perform test_login(a);
-  r := apply_proposal(p, null, null, false);
+  r := apply_proposal(p, null, array[0], false);
   assert jsonb_array_length(r->'blocks') = 1;
   execute 'reset role';
   assert (select count(*) from plan_blocks where user_id = a and status = 'moved') = 2, '앞으로의 잠기지 않은 planned 두 개가 moved';
@@ -202,7 +202,7 @@ begin
   insert into assistant_proposals (user_id, kind, input, proposal) values (a, 'reschedule', '{}',
     jsonb_build_object('todos', '[]'::jsonb, 'done_todo_ids', '[]'::jsonb, 'blocks', '[]'::jsonb)) returning id into p;
   perform test_login(a);
-  perform apply_proposal(p, null, null, false);
+  perform apply_proposal(p, null, array[]::int[], false);
   execute 'reset role';
   assert (select count(*) from plan_blocks where user_id = a and status = 'moved') = 2;
 
@@ -214,6 +214,6 @@ begin
          'end', to_char((now() + interval '3 days 50 minutes') at time zone 'Asia/Seoul', 'YYYY-MM-DD"T"HH24:MI:SS') || '+09:00'))))
   returning id into p;
   perform test_login(a);
-  perform d_expect(format($q$select apply_proposal(%L, null, null, false)$q$, p), 'invalid_input');
+  perform d_expect(format($q$select apply_proposal(%L, null, array[0], false)$q$, p), 'invalid_input');
   execute 'reset role';
 end $$;

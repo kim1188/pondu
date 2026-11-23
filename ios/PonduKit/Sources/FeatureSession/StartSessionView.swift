@@ -44,9 +44,19 @@ struct StartSessionView: View {
                 }
                 Section("공개 대상") {
                     Picker("공개 대상", selection: $d.visibility) {
-                        ForEach(ShareTarget.allCases) { Text($0.title).tag($0) }
+                        ForEach(d.availableTargets) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.segmented)
+                    if d.visibility == .crew {
+                        if d.crews.count == 1 {
+                            LabeledContent("크루", value: d.crews[0].name)
+                        } else {
+                            Picker("크루", selection: $d.groupID) {
+                                Text("크루를 골라 주세요").tag(UUID?.none)
+                                ForEach(d.crews) { Text($0.name).tag(Optional($0.id)) }
+                            }
+                        }
+                    }
                     if d.visibility != .private {
                         TextField("친구에게 보일 제목(선택)", text: $d.shareTitle)
                     }

@@ -138,6 +138,11 @@ final class TodayModel {
         presentStart(todo: todo, threadID: todo.threadId, blockID: block?.id, fallbackTitle: nil)
     }
 
+    /// 연결된 할 일 없이 시작 화면을 연다. 분야와 공개 대상은 시작 화면에서 고른다.
+    func startFree() {
+        sessions.presentStart(StartSessionRequest())
+    }
+
     func startFromNotification(blockID: UUID?, todoID: UUID?) {
         if let blockID, let b = snapshot?.blocks.first(where: { $0.id == blockID }) { start(block: b); return }
         if let todoID, let t = snapshot?.todo(todoID) { start(todo: t); return }

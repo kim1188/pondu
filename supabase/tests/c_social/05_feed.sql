@@ -27,10 +27,10 @@ begin
   assert page::text not like '%공유용 제목%' or true;
   card := (select i from jsonb_array_elements(page -> 'items') i where (i ->> 'session_id')::uuid = s);
   keys := array(select jsonb_object_keys(card) order by 1);
-  assert keys = array['author','capture_mode','comment_count','duration_seconds','end_corrected','ended_at','joined_with',
+  assert keys = array['author','capture_mode','comment_count','duration_seconds','end_corrected','ended_at','group_id','group_name','joined_with',
     'my_reaction','offline_started','photo_path','photo_thumb_path','primary_category','progress_note','reaction_count',
     'session_id','share_title','started_at','status','thread_id'], format('카드 필드: %s', keys);
-  assert card ->> 'share_title' = 'study', '공유 제목이 없으면 분야 이름';
+  assert card -> 'share_title' = 'null'::jsonb, '공유 제목이 없으면 JSON null(앱이 분야 이름으로 채움)';
   assert (card ->> 'duration_seconds')::int = 30 * 60 - 60, format('종료 세션 시간 %s', card ->> 'duration_seconds');
   assert card ->> 'capture_mode' = 'in_app_photo' and card ->> 'progress_note' = '진척 메모';
   assert card -> 'author' ->> 'id' = fr::text, '작성자 카드';

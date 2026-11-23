@@ -17,12 +17,13 @@ enum Fixtures {
 
     static func card(id: UUID = UUID(), authorID: UUID = UUID(), authorName: String = "가온",
                      status: String = "live", myReaction: String? = nil,
-                     reactionCount: Int = 0, commentCount: Int = 0) -> [String: Any] {
+                     reactionCount: Int = 0, commentCount: Int = 0,
+                     shareTitle: String? = "DB 과제", groupName: String? = nil) -> [String: Any] {
         [
             "session_id": id.uuidString.lowercased(),
             "author": profile(id: authorID, name: authorName),
             "thread_id": NSNull(),
-            "share_title": "DB 과제",
+            "share_title": shareTitle.map { $0 as Any } ?? NSNull(),
             "primary_category": "study",
             "started_at": "2026-11-22T06:12:00Z",
             "ended_at": NSNull(),
@@ -38,6 +39,8 @@ enum Fixtures {
             "reaction_count": reactionCount,
             "my_reaction": myReaction.map { $0 as Any } ?? NSNull(),
             "comment_count": commentCount,
+            "group_id": groupName == nil ? (NSNull() as Any) : ("33333333-3333-3333-3333-333333333333" as Any),
+            "group_name": groupName.map { $0 as Any } ?? NSNull(),
         ]
     }
 

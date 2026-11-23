@@ -195,9 +195,9 @@ struct ConsentView: View {
             Text("비서를 쓰기 전에").font(.title2.bold())
             Text("비서가 계획을 만들려고 아래 내용을 서버와 AI에 보내요.")
             VStack(alignment: .leading, spacing: 10) {
-                Label("내가 입력한 문장", systemImage: "text.cursor")
-                Label("선택한 할 일의 제목", systemImage: "checklist")
-                Label("캘린더의 바쁜 시간 구간(시작과 끝만)", systemImage: "calendar")
+                Label("입력한 문장", systemImage: "text.cursor")
+                Label("열린 할 일의 제목", systemImage: "checklist")
+                Label("바쁜 시간 구간(시작과 끝만)", systemImage: "calendar")
             }
             Text("캘린더 일정의 제목과 메모는 기기 밖으로 나가지 않아요. 비서는 초안만 만들고, 내가 적용해야 저장돼요.")
                 .font(.footnote).foregroundStyle(.secondary)

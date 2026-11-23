@@ -106,6 +106,7 @@ public final class SessionController: SessionControlling {
         draft = d
         route = .start
         Task { [backend] in await d.loadThreads(using: backend) }
+        Task { [backend] in await d.loadCrews(using: backend) }
     }
 
     func cancelStart() {
@@ -131,7 +132,7 @@ public final class SessionController: SessionControlling {
 
     /// 시작을 누른다. 서버 응답을 기다리지 않고 바로 진행 중 화면으로 바꾼다.
     func commitStart() {
-        guard let d = draft, let category = d.category, !d.isProcessingPhoto, live == nil else { return }
+        guard let d = draft, let category = d.category, !d.isProcessingPhoto, d.hasValidCrewChoice, live == nil else { return }
         let title = d.shareTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let hasPhoto = d.photo != nil
         let p = PendingStart(
@@ -139,6 +140,7 @@ public final class SessionController: SessionControlling {
             category: category,
             captureMode: hasPhoto ? "in_app_photo" : "no_photo",
             visibility: d.visibility.rawValue,
+            groupID: d.resolvedGroupID,
             threadID: d.threadID,
             todoID: d.todoID,
             planBlockID: d.planBlockID,
@@ -243,6 +245,8 @@ public final class SessionController: SessionControlling {
         guard let before = live, let choice = endDraft.choice, !isBusy else { return }
         let note = endDraft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         let todoID = currentTodoID
+        // 막대를 내리기 전에 서버 id를 잡아 둔다. live를 비운 뒤에는 읽을 수 없다.
+        let knownServerID = before.serverID
         live = nil
         route = .none
         isBusy = true
@@ -250,7 +254,16 @@ public final class SessionController: SessionControlling {
         mutationTask = Task {
             defer { self.isBusy = false }
             do {
-                let id = try await self.resolveServerID()
+                let id: UUID
+                if let knownServerID {
+                    id = knownServerID
+                } else {
+                    // 시작 요청이 아직 가는 중이면 끝나기를 기다린다. 끝나면 서버 값으로 live가 다시 채워진다.
+                    await self.startTask?.value
+                    guard let lateID = self.live?.serverID else { throw BackendError(code: "network") }
+                    id = lateID
+                    self.live = nil
+                }
                 let pair: SessionPair = try await self.backend.rpc("end_session", [
                     "p_session_id": .string(id.uuidString.lowercased()),
                     "p_outcome": .string(choice.serverValue),
@@ -262,6 +275,7 @@ public final class SessionController: SessionControlling {
                     self.adopt(pair, clientID: before.clientID)
                     return
                 }
+                self.live = nil
                 self.liveSession = nil
                 self.lastEndedSession = pair.dto
                 self.removePhotoFilesIfNoPending(clientID: before.clientID)
@@ -372,7 +386,8 @@ public final class SessionController: SessionControlling {
             startedAt: s.startedAt,
             isOfflineStart: s.offlineStartedAt != nil,
             captureMode: s.captureMode,
-            todoID: prev?.todoID)
+            // 앱을 껐다 켠 뒤 서버에서 받은 세션은 prev가 없으므로 서버가 준 todo_id를 쓴다.
+            todoID: prev?.todoID ?? pair.dto.todoId)
         live = state
         liveSession = pair.dto
         if phase == .needsConfirmation {

@@ -3,22 +3,8 @@ import PonduCore
 
 // FeatureTogether 안에서만 쓰는 작은 부품. PonduCore에 없는 응답 모양과 공용 도우미.
 
-/// `list_crew_members`의 한 행: ProfileCard + role.
-struct CrewMemberDTO: Decodable, Identifiable, Equatable {
-    let id: UUID
-    let handle: String
-    let displayName: String
-    let avatarPath: String?
-    let departmentName: String?
-    let role: String
-
+extension CrewMemberDTO {
     var isOwner: Bool { role == "owner" }
-}
-
-/// `list_friend_requests`의 응답.
-struct FriendRequestsDTO: Decodable {
-    let incoming: [ProfileCard]
-    let outgoing: [ProfileCard]
 }
 
 /// 한마디 목록에 그리는 값. CommentDTO를 그대로 쓰지 않는 이유는

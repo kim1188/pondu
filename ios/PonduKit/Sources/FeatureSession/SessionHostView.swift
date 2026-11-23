@@ -14,12 +14,14 @@ public struct SessionHostView<Content: View>: View {
     }
 
     public var body: some View {
-        content
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if let live = controller.live {
-                    LiveBar(controller: controller, live: live)
-                }
+        // 막대를 safeAreaInset으로 얹으면 탭 안의 내비게이션 막대(제목, 뒤로, 추가 버튼)를 덮는다.
+        // 세로로 쌓아서 탭 화면 전체가 막대 아래에서 시작하게 한다.
+        VStack(spacing: 0) {
+            if let live = controller.live {
+                LiveBar(controller: controller, live: live)
             }
+            content
+        }
             .sheet(isPresented: routeBinding(.start)) {
                 if let draft = controller.draft { StartSessionView(controller: controller, draft: draft) }
             }

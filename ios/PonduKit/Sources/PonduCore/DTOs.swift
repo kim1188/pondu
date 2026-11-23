@@ -79,8 +79,10 @@ public struct SessionDTO: Identifiable, Hashable, Codable, Sendable {
     public var visibility: ShareVisibility
     public var endCorrected: Bool
     public var offlineStartedAt: Date?
+    /// 크루에게 공개한 세션이면 그 크루의 id. 그 밖에는 nil(옛 서버 응답에도 없다).
+    public var groupId: UUID?
 
-    public init(id: UUID = UUID(), userId: UUID = UUID(), threadId: UUID? = nil, todoId: UUID? = nil, planBlockId: UUID? = nil, joinedSessionId: UUID? = nil, primaryCategory: ActivityCategory = .study, tags: [String] = [], startedAt: Date = Date(), endedAt: Date? = nil, pausedAt: Date? = nil, pausedSeconds: Int = 0, durationSeconds: Int = 0, status: SessionStatus = .live, outcome: SessionOutcome? = nil, captureMode: CaptureMode = .noPhoto, photoPath: String? = nil, photoThumbPath: String? = nil, shareTitle: String? = nil, progressNote: String? = nil, visibility: ShareVisibility = .private, endCorrected: Bool = false, offlineStartedAt: Date? = nil) {
+    public init(id: UUID = UUID(), userId: UUID = UUID(), threadId: UUID? = nil, todoId: UUID? = nil, planBlockId: UUID? = nil, joinedSessionId: UUID? = nil, primaryCategory: ActivityCategory = .study, tags: [String] = [], startedAt: Date = Date(), endedAt: Date? = nil, pausedAt: Date? = nil, pausedSeconds: Int = 0, durationSeconds: Int = 0, status: SessionStatus = .live, outcome: SessionOutcome? = nil, captureMode: CaptureMode = .noPhoto, photoPath: String? = nil, photoThumbPath: String? = nil, shareTitle: String? = nil, progressNote: String? = nil, visibility: ShareVisibility = .private, endCorrected: Bool = false, offlineStartedAt: Date? = nil, groupId: UUID? = nil) {
         self.id = id
         self.userId = userId
         self.threadId = threadId
@@ -104,6 +106,42 @@ public struct SessionDTO: Identifiable, Hashable, Codable, Sendable {
         self.visibility = visibility
         self.endCorrected = endCorrected
         self.offlineStartedAt = offlineStartedAt
+        self.groupId = groupId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, userId, threadId, todoId, planBlockId, joinedSessionId, primaryCategory, tags, startedAt, endedAt
+        case pausedAt, pausedSeconds, durationSeconds, status, outcome, captureMode, photoPath, photoThumbPath
+        case shareTitle, progressNote, visibility, endCorrected, offlineStartedAt, groupId
+    }
+
+    /// `duration_seconds`는 종료 확인이 필요한 세션(`needs_confirmation`)에서 null이다(계약 보정 R13). 그때는 0으로 읽는다.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        userId = try c.decode(UUID.self, forKey: .userId)
+        threadId = try c.decodeIfPresent(UUID.self, forKey: .threadId)
+        todoId = try c.decodeIfPresent(UUID.self, forKey: .todoId)
+        planBlockId = try c.decodeIfPresent(UUID.self, forKey: .planBlockId)
+        joinedSessionId = try c.decodeIfPresent(UUID.self, forKey: .joinedSessionId)
+        primaryCategory = try c.decode(ActivityCategory.self, forKey: .primaryCategory)
+        tags = try c.decode([String].self, forKey: .tags)
+        startedAt = try c.decode(Date.self, forKey: .startedAt)
+        endedAt = try c.decodeIfPresent(Date.self, forKey: .endedAt)
+        pausedAt = try c.decodeIfPresent(Date.self, forKey: .pausedAt)
+        pausedSeconds = try c.decode(Int.self, forKey: .pausedSeconds)
+        durationSeconds = try c.decodeIfPresent(Int.self, forKey: .durationSeconds) ?? 0
+        status = try c.decode(SessionStatus.self, forKey: .status)
+        outcome = try c.decodeIfPresent(SessionOutcome.self, forKey: .outcome)
+        captureMode = try c.decode(CaptureMode.self, forKey: .captureMode)
+        photoPath = try c.decodeIfPresent(String.self, forKey: .photoPath)
+        photoThumbPath = try c.decodeIfPresent(String.self, forKey: .photoThumbPath)
+        shareTitle = try c.decodeIfPresent(String.self, forKey: .shareTitle)
+        progressNote = try c.decodeIfPresent(String.self, forKey: .progressNote)
+        visibility = try c.decode(ShareVisibility.self, forKey: .visibility)
+        endCorrected = try c.decode(Bool.self, forKey: .endCorrected)
+        offlineStartedAt = try c.decodeIfPresent(Date.self, forKey: .offlineStartedAt)
+        groupId = try c.decodeIfPresent(UUID.self, forKey: .groupId)
     }
 
     public var isActive: Bool { status == .live || status == .paused }
@@ -120,14 +158,17 @@ public struct ThreadDTO: Identifiable, Hashable, Codable, Sendable {
     public var primaryCategory: ActivityCategory
     public var defaultVisibility: ShareVisibility
     public var archivedAt: Date?
+    /// 크루 공개가 기본인 일이면 기본 크루의 id.
+    public var defaultGroupId: UUID?
 
-    public init(id: UUID = UUID(), title: String = "", shareTitle: String? = nil, primaryCategory: ActivityCategory = .study, defaultVisibility: ShareVisibility = .private, archivedAt: Date? = nil) {
+    public init(id: UUID = UUID(), title: String = "", shareTitle: String? = nil, primaryCategory: ActivityCategory = .study, defaultVisibility: ShareVisibility = .private, archivedAt: Date? = nil, defaultGroupId: UUID? = nil) {
         self.id = id
         self.title = title
         self.shareTitle = shareTitle
         self.primaryCategory = primaryCategory
         self.defaultVisibility = defaultVisibility
         self.archivedAt = archivedAt
+        self.defaultGroupId = defaultGroupId
     }
 }
 
@@ -238,8 +279,11 @@ public struct FeedCardDTO: Identifiable, Hashable, Codable, Sendable {
     public var reactionCount: Int
     public var myReaction: String?
     public var commentCount: Int
+    /// 크루에게 공개한 기록이면 그 크루의 id와 이름.
+    public var groupId: UUID?
+    public var groupName: String?
 
-    public init(sessionId: UUID = UUID(), author: ProfileCard = ProfileCard(), threadId: UUID? = nil, shareTitle: String? = nil, primaryCategory: ActivityCategory = .study, startedAt: Date = Date(), endedAt: Date? = nil, status: SessionStatus = .live, durationSeconds: Int = 0, progressNote: String? = nil, photoPath: String? = nil, photoThumbPath: String? = nil, captureMode: CaptureMode = .noPhoto, endCorrected: Bool = false, offlineStarted: Bool = false, joinedWith: ProfileCard? = nil, reactionCount: Int = 0, myReaction: String? = nil, commentCount: Int = 0) {
+    public init(sessionId: UUID = UUID(), author: ProfileCard = ProfileCard(), threadId: UUID? = nil, shareTitle: String? = nil, primaryCategory: ActivityCategory = .study, startedAt: Date = Date(), endedAt: Date? = nil, status: SessionStatus = .live, durationSeconds: Int = 0, progressNote: String? = nil, photoPath: String? = nil, photoThumbPath: String? = nil, captureMode: CaptureMode = .noPhoto, endCorrected: Bool = false, offlineStarted: Bool = false, joinedWith: ProfileCard? = nil, reactionCount: Int = 0, myReaction: String? = nil, commentCount: Int = 0, groupId: UUID? = nil, groupName: String? = nil) {
         self.sessionId = sessionId
         self.author = author
         self.threadId = threadId
@@ -259,9 +303,17 @@ public struct FeedCardDTO: Identifiable, Hashable, Codable, Sendable {
         self.reactionCount = reactionCount
         self.myReaction = myReaction
         self.commentCount = commentCount
+        self.groupId = groupId
+        self.groupName = groupName
     }
 
     public var id: UUID { sessionId }
+
+    /// 화면에 보일 제목. 공유 제목이 없거나 비었으면 분야 이름으로 채운다(계약 보정 R8).
+    public var displayTitle: String {
+        if let title = shareTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty { return title }
+        return primaryCategory.displayName
+    }
     public var isLive: Bool { status == .live || status == .paused }
     public var recordBadges: [String] {
         RecordBadge.labels(captureMode: captureMode, endCorrected: endCorrected, offlineStarted: offlineStarted)

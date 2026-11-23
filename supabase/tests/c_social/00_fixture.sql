@@ -18,31 +18,35 @@ end $$;
 create or replace function c_t_school(p_name text default 'c_t_school') returns uuid language plpgsql as $$
 declare s uuid;
 begin
-  insert into schools (name, email_domains) values (p_name || gen_random_uuid(), array['x.test']) returning id into s;
+  insert into schools (name, email_domains) values (p_name || gen_random_uuid(), array['korea.ac.kr']) returning id into s;
   return s;
 end $$;
 
 create or replace function c_t_user(p_handle text, p_school uuid) returns uuid language plpgsql as $$
 declare u uuid := gen_random_uuid();
 begin
-  insert into auth.users (id, email) values (u, u || '@x.test');
+  insert into auth.users (id, email) values (u, u || '@korea.ac.kr');
   insert into profiles (id, school_id, handle, display_name)
   values (u, p_school, left(p_handle || '_' || substr(u::text, 1, 6), 20), p_handle);
   return u;
 end $$;
 
 -- 세션 직접 삽입(관리자 권한에서). 흐름 B 함수에 기대지 않는다.
+-- crew 공개인데 크루를 안 주면, 작성자가 활동 중인 크루가 정확히 하나일 때 그 크루로 묶는다.
 create or replace function c_t_session(p_user uuid, p_vis visibility, p_status session_status default 'ended',
   p_started timestamptz default now() - interval '1 hour', p_title text default null,
-  p_thread uuid default null, p_joined uuid default null) returns uuid language plpgsql as $$
-declare s uuid;
+  p_thread uuid default null, p_joined uuid default null, p_group uuid default null) returns uuid language plpgsql as $$
+declare s uuid; g uuid := p_group;
 begin
+  if g is null and p_vis = 'crew' and (select count(*) from group_members where user_id = p_user and status = 'active') = 1 then
+    select group_id into g from group_members where user_id = p_user and status = 'active';
+  end if;
   insert into sessions (user_id, client_id, primary_category, started_at, ended_at, status, visibility,
-                        share_title, thread_id, joined_session_id, paused_at)
+                        share_title, thread_id, joined_session_id, paused_at, group_id)
   values (p_user, gen_random_uuid(), 'study', p_started,
           case when p_status in ('ended', 'needs_confirmation') then p_started + interval '30 minutes' end,
           p_status, p_vis, p_title, p_thread, p_joined,
-          case when p_status = 'paused' then p_started + interval '10 minutes' end)
+          case when p_status = 'paused' then p_started + interval '10 minutes' end, g)
   returning id into s;
   return s;
 end $$;

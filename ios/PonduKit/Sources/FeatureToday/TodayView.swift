@@ -68,6 +68,7 @@ struct TodayView: View {
         List {
             if let hint = model.rescheduleHint { rescheduleBanner(hint) }
             liveSection
+            freeStartSection
             fixedSection
             startableSection
             assistantSection
@@ -88,6 +89,17 @@ struct TodayView: View {
                         .buttonStyle(.borderedProminent)
                     Button("나중에") { model.dismissRescheduleHint() }.buttonStyle(.bordered)
                 }
+            }
+        }
+    }
+
+    /// 할 일이나 예정 시간 없이도 바로 세션을 시작하는 눈에 보이는 진입점.
+    @ViewBuilder private var freeStartSection: some View {
+        if model.live == nil {
+            Section {
+                Button { model.startFree() } label: { Label("지금 시작", systemImage: "play.fill") }
+            } footer: {
+                Text("할 일을 오른쪽으로 밀어도 그 일로 바로 시작할 수 있어요.")
             }
         }
     }

@@ -96,7 +96,7 @@ begin
   -- 프로필 없는 로그인 사용자
   declare ghost uuid := gen_random_uuid();
   begin
-    insert into auth.users (id, email) values (ghost, ghost || '@x.test');
+    insert into auth.users (id, email) values (ghost, ghost || '@korea.ac.kr');
     perform test_login(ghost);
     perform c_t_err($q$select create_crew('가')$q$, 'profile_required');
     perform c_t_err($q$select join_crew('ABCDEFGH')$q$, 'profile_required');

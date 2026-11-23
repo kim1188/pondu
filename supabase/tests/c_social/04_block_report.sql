@@ -40,7 +40,12 @@ begin
   assert sc_ = any (c_t_ids(get_feed(null, 50, null))), '다른 사람은 그대로 보임';
   perform c_t_err(format('select list_comments(%L)', sa), 'not_found');
   perform c_t_err(format('select add_comment(%L, %L)', sa, 'hi'), 'not_found');
-  perform c_t_err(format('select send_friend_request(%L)', a), 'blocked');
+  -- 나를 차단한 상대에게 보내면 차단 사실이 드러나지 않게 아무 일 없이 성공한다
+  assert send_friend_request(a) is null, '차단당한 쪽의 요청은 조용히 성공';
+  reset role;
+  assert not exists (select 1 from friendships where user_a in (a, b) and user_b in (a, b)), '요청 행이 생기지 않음';
+  assert not exists (select 1 from notification_outbox where user_id = a and kind = 'friend_request' and (payload ->> 'user_id')::uuid = b), '알림도 없음';
+  perform test_login(b);
   assert (select count(*) from jsonb_array_elements(list_crew_members(g))) = 2, '크루 목록에서 a가 빠짐';
   assert list_friends() = jsonb_build_array(pc);
   -- c의 세션에 달린 a 흔적도 b에게는 안 보임

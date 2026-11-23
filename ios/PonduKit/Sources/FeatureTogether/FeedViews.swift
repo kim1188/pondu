@@ -3,20 +3,6 @@ import PonduCore
 
 // MARK: - 공용 작은 뷰
 
-/// ErrorRetryView의 생성자 모양이 계약에 없어서 이 타깃 안에 둔 작은 대체품.
-struct TogetherRetryView: View {
-    let message: String
-    let retry: () -> Void
-    var body: some View {
-        VStack(spacing: 12) {
-            Text(message).font(.subheadline).foregroundStyle(.secondary)
-            Button("다시 시도", action: retry).buttonStyle(.bordered)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(32)
-    }
-}
-
 struct InitialAvatar: View {
     let name: String
     var size: CGFloat = 36
@@ -140,7 +126,7 @@ struct FeedView: View {
             .skeleton(true)
             .disabled(true)
         case .failed:
-            TogetherRetryView(message: "피드를 불러오지 못했어요.") { Task { await model.reload() } }
+            ErrorRetryView(message: "피드를 불러오지 못했어요.") { Task { await model.reload() } }
             Spacer()
         case .ready:
             if model.items.isEmpty {
@@ -181,7 +167,7 @@ private struct HistorySheet: View {
         _model = State(initialValue: ThreadHistoryModel(backend: backend, sessionID: card.sessionId))
     }
     var body: some View {
-        ThreadHistoryView(model: model, title: card.shareTitle ?? card.primaryCategory.displayName)
+        ThreadHistoryView(model: model, title: card.displayTitle)
     }
 }
 
@@ -260,7 +246,7 @@ struct FeedCardView: View {
         VStack(alignment: .leading, spacing: 10) {
             header
             // 사람·사진·한 줄 진척이 앞. 시간과 기록 방식은 아래에 작게.
-            Text(card.shareTitle ?? card.primaryCategory.displayName)
+            Text(card.displayTitle)
                 .font(.body.weight(.medium))
             if let note = card.progressNote, !note.isEmpty {
                 Text("“\(note)”").font(.callout).foregroundStyle(.primary)
@@ -290,6 +276,9 @@ struct FeedCardView: View {
                 HStack(spacing: 6) {
                     Circle().fill(card.primaryCategory.color).frame(width: 8, height: 8)
                     Text(card.primaryCategory.displayName).font(.caption).foregroundStyle(.secondary)
+                    if let groupName = card.groupName, !groupName.isEmpty {
+                        Text("· 크루 \(groupName)").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
                     if item.card.status == .live {
                         Text("진행 중").font(.caption.weight(.semibold)).foregroundStyle(.green)
                     } else if item.card.status == .paused {
@@ -353,7 +342,7 @@ struct ThreadHistoryView: View {
             case .loading:
                 List { ForEach(0..<3, id: \.self) { _ in FeedCardPlaceholder() } }.listStyle(.plain).skeleton(true)
             case .failed:
-                TogetherRetryView(message: "지난 기록을 불러오지 못했어요.") { Task { await model.load() } }
+                ErrorRetryView(message: "지난 기록을 불러오지 못했어요.") { Task { await model.load() } }
             case .ready:
                 if model.cards.isEmpty {
                     Text("볼 수 있는 지난 기록이 아직 없어요.").foregroundStyle(.secondary)
@@ -395,7 +384,7 @@ struct CommentsView: View {
                 case .loading:
                     List { ForEach(0..<3, id: \.self) { _ in Text("이름 한마디가 들어가는 자리") } }.skeleton(true)
                 case .failed:
-                    TogetherRetryView(message: "한마디를 불러오지 못했어요.") { Task { await model.load() } }
+                    ErrorRetryView(message: "한마디를 불러오지 못했어요.") { Task { await model.load() } }
                     Spacer()
                 case .ready:
                     if model.comments.isEmpty {

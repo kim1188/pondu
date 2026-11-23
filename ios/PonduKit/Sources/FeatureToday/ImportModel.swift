@@ -43,34 +43,21 @@ enum ImportLogic {
         }
     }
 
-    /// `import_todos`의 `p_items`. 날짜만 있으면 그날 정오(현지)로 두고 `due_has_time = false`.
-    static func payload(rows: [ImportRow], timeZone: TimeZone) -> JSONValue {
-        let cal = TodayLogic.calendar(timeZone: timeZone)
+    /// `import_todos`의 `p_items`. import-extract가 준 `due_date`("YYYY-MM-DD")와 `due_time`("HH:MM" 또는 null)을
+    /// 그대로 보낸다. 시각을 앱이 만들어 보내지 않는다(날짜만 있을 때의 기본 시각과 시간대 처리는 서버가 한다).
+    static func payload(rows: [ImportRow]) -> JSONValue {
         let items: [JSONValue] = rows.filter(\.isSelected).map { r in
             let c = r.candidate
-            let due = dueDate(date: c.dueDate, time: c.dueTime, calendar: cal)
             return .object([
                 "title": .string(c.title),
-                "due_at": .date(due),
-                "due_has_time": .bool(due != nil && c.dueTime != nil),
+                "due_date": .text(c.dueDate),
+                "due_time": .text(c.dueTime),
                 "estimate_min": .int(c.estimateMin),
                 "source_ref": .string(c.sourceRef),
                 "done": .bool(c.done),
             ])
         }
         return .array(items)
-    }
-
-    static func dueDate(date: String?, time: String?, calendar: Calendar) -> Date? {
-        guard let date else { return nil }
-        let d = date.split(separator: "-").compactMap { Int($0) }
-        guard d.count == 3 else { return nil }
-        var comps = DateComponents(year: d[0], month: d[1], day: d[2], hour: 12, minute: 0)
-        if let time {
-            let t = time.split(separator: ":").compactMap { Int($0) }
-            if t.count >= 2 { comps.hour = t[0]; comps.minute = t[1] }
-        }
-        return calendar.date(from: comps)
     }
 }
 
@@ -127,7 +114,7 @@ final class ImportModel {
         phase = .saving
         do {
             let res: ImportCreateResult = try await today.backend.rpc("import_todos", [
-                "p_source": .string(source), "p_items": ImportLogic.payload(rows: rows, timeZone: today.timeZone),
+                "p_source": .string(source), "p_items": ImportLogic.payload(rows: rows),
             ])
             phase = .done(created: res.created.count, skipped: res.skipped)
             await today.load()

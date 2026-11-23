@@ -78,7 +78,7 @@ SUPABASE_ANON_KEY = eyJ...공개용 키...
 | 위치 | 하는 일 |
 |---|---|
 | `App/PonduApp.swift` | 진입점. 설정이 없으면 안내 화면, 있으면 `RootView` |
-| `App/AppEnvironment.swift` | `SupabaseBackend`, `SessionController`, `ImageLoader`, `AuthStore`, `AppDependencies` 조립 |
+| `App/AppEnvironment.swift` | `SupabaseBackend`, `SessionController`, `ImageLoader`, `AuthStore`, `AppDependencies` 조립. 예정 시각 알림을 누르면 `deps.sessions.presentStart`가 불리도록 `TodayNotificationHandler`를 `UNUserNotificationCenter.delegate`로 건다 |
 | `App/RootView.swift` | 진입 규칙(메일 입력 / 프로필 만들기 / 홈). 홈은 `SessionHostView(controller:) { MainTabView }` |
 | `App/MainTabView.swift` | 탭 3개(오늘 `TodayRootView`, 함께 `TogetherRootView`, 기록 `RecordRootView`)와 설정 진입점 |
 | `App/SettingsView.swift` | 내 프로필 보기·수정(`ProfileEditView`), 로그아웃 |
