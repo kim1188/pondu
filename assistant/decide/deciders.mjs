@@ -74,10 +74,10 @@ export function openaiChatDecider({ model, client, effort } = {}) {
 }
 
 /**
- * 시험용 결정기. 참/거짓은 항상 거짓, 고르기는 strategy 가 정한다(기본: 건너뛰기가 아닌 첫 선택지).
+ * 시험용 결정기. 끝냈는가는 거짓, 사용자의 말에 맞는가는 참으로 답하고, 고르기는 pick 이 정한다(기본: 건너뛰기가 아닌 첫 선택지).
  * @returns {import('./loop.mjs').Decider}
  */
-export function fakeDecider({ pick = choices => (choices.find(c => c.value !== 'skip') ?? choices[0]).value, bool = () => 0 } = {}) {
+export function fakeDecider({ pick = choices => (choices.find(c => c.value !== 'skip') ?? choices[0]).value, bool = id => (id.startsWith('done:') ? 0 : 1) } = {}) {
   return async ({ view, questions }) => ({
     answers: Object.fromEntries(Object.entries(questions).map(([id, q]) => [id, q.type === 'bool'
       ? { type: 'bool', probability: bool(id, q, view) } : { type: 'choice', choice: pick(q.choices, id, view), confidence: 1 }])),

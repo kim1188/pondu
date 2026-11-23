@@ -43,11 +43,11 @@ test('가장 이른 자리만 고르는 결정기로도 대부분의 배치 사�
 
 test('끝냈다는 답이 확률 0.8 이상일 때만 완료로 표시하고 그 일에는 시간을 잡지 않는다', async () => {
   const c = CASES.find(x => x.id === 'r08');
-  const sure = await proposeByDeciding(c.input, { decider: fakeDecider({ bool: id => (id === 'done:t1' ? 0.95 : 0.01) }) });
+  const sure = await proposeByDeciding(c.input, { decider: fakeDecider({ bool: id => (id === 'done:t1' ? 0.95 : id.startsWith('done:') ? 0.01 : 1) }) });
   assert.deepEqual(sure.proposal.done_todo_ids, ['t1']);
   assert.ok(!sure.proposal.blocks.some(b => b.todo_ref === 't1'));
   assert.equal(grade(c, sure.proposal).grade.pass, 1);
-  const unsure = await proposeByDeciding(c.input, { decider: fakeDecider({ bool: () => 0.7 }) });
+  const unsure = await proposeByDeciding(c.input, { decider: fakeDecider({ bool: id => (id.startsWith('done:') ? 0.7 : 1) }) });
   assert.deepEqual(unsure.proposal.done_todo_ids, []);
 });
 
@@ -81,6 +81,29 @@ test('모든 질문은 선택지가 2개 이상이다(자리가 없는 일은 �
   // 할 일이 없으면 모델을 부르지 않는다
   const p06 = await proposeByDeciding(CASES.find(x => x.id === 'p06').input, { decider: async () => { throw new Error('부르면 안 됨'); } });
   assert.equal(p06.usage.requests, 0);
+});
+
+test('사용자의 말에 어긋난다고 답한 자리는 선택지에서 빠지고, 잡지 말라는 일은 건너뛴다', async () => {
+  // 점심(12~13시)과 겹치는 자리에만 거짓으로 답하는 결정기
+  const p09 = CASES.find(x => x.id === 'p09');
+  const overlapsLunch = text => {
+    const m = /(\d\d):(\d\d)~(\d\d):(\d\d)/.exec(text);
+    if (!m) return false;
+    const s = +m[1] * 60 + +m[2], e = +m[3] * 60 + +m[4];
+    return s < 13 * 60 && e > 12 * 60;
+  };
+  const lunchAware = fakeDecider({ bool: (id, q) => (id.startsWith('done:') ? 0 : id === 'want' ? 1 : overlapsLunch(q.instructions) ? 0 : 1) });
+  const a = await proposeByDeciding(p09.input, { decider: lunchAware });
+  assert.equal(grade(p09, a.proposal).grade.pass, 1, JSON.stringify(a.proposal.blocks));
+  // 첫 일만 잡으라는 답: 이미 하나가 놓였으면 want 가 거짓
+  const p16 = CASES.find(x => x.id === 'p16');
+  const onlyOne = fakeDecider({ bool: (id, q, view) => (id.startsWith('done:') ? 0 : id === 'want' ? (view.already_placed.length === 0 ? 1 : 0) : 1) });
+  const b = await proposeByDeciding(p16.input, { decider: onlyOne });
+  assert.equal(grade(p16, b.proposal).grade.pass, 1, JSON.stringify(b.proposal));
+  // 사용자의 말이 없는 요청은 점검 질문 없이 바로 자리 고르기로 간다
+  let sawCheck = false;
+  await proposeByDeciding(CASES.find(x => x.id === 'r02').input, { decider: async req => { sawCheck ||= 'want' in req.questions; return fakeDecider()(req); } });
+  assert.equal(sawCheck, false);
 });
 
 test('capture 는 이 도메인이 다루지 않는다', () => {
