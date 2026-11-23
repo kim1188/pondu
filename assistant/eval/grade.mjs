@@ -99,6 +99,13 @@ export function grade(c, proposal) {
   for (const id of x.not_today ?? []) {
     if (blocksFor(id, proposal).some(b => localDate(ms(b.start)) === today)) fails.push(`${id} 가 오늘 다시 잡힘`);
   }
+  for (const [id, hm] of Object.entries(x.start_before ?? {})) {
+    for (const b of blocksFor(id, proposal)) if (localHM(ms(b.start)) >= hm) fails.push(`${id} 가 ${hm} 이후에 시작`);
+  }
+  if (x.scheduled_todos) {
+    const n = new Set(proposal.blocks.map(b => b.todo_ref)).size;
+    if (n < x.scheduled_todos[0] || n > x.scheduled_todos[1]) fails.push(`시간이 잡힌 할 일 ${n}개 (기대 ${x.scheduled_todos[0]}~${x.scheduled_todos[1]})`);
+  }
   if (x.no_blocks_on && proposal.blocks.some(b => localDate(ms(b.start)) === x.no_blocks_on)) fails.push(`${x.no_blocks_on} 에 블록이 있음`);
   for (const w of x.avoid ?? []) {
     if (proposal.blocks.some(b => overlaps(ms(b.start), ms(b.end), ms(w.start), ms(w.end)))) fails.push('사용자가 비워 달라고 한 시간과 겹침');

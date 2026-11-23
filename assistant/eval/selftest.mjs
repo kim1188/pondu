@@ -10,7 +10,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EMPTY_PROPOSAL } from '../core/schema.mjs';
 import { at } from '../core/time.mjs';
-import { CASES, D } from './cases.mjs';
+import { CASES as MAIN, HELDOUT, D } from './cases.mjs';
+// 채점기와 사례의 정합성은 따로 떼어 둔 사례까지 함께 점검한다.
+const CASES = [...MAIN, ...HELDOUT];
 import { grade } from './grade.mjs';
 
 let bad = 0;
@@ -18,7 +20,7 @@ const fail = msg => { bad++; console.log('  ✗ ' + msg); };
 const byId = Object.fromEntries(CASES.map(c => [c.id, c]));
 const clone = x => JSON.parse(JSON.stringify(x));
 
-console.log(`사례 ${CASES.length}개`);
+console.log(`사례 ${CASES.length}개 (기본 ${MAIN.length} + 따로 떼어 둔 것 ${HELDOUT.length})`);
 
 // 1) 모범 답
 let oraclePass = 0;

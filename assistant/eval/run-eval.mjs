@@ -149,7 +149,9 @@ import { openaiChatDecider, openaiDecisions } from '../decide/deciders.mjs';
 import { proposeByDeciding } from '../decide/propose.mjs';
 import { SYSTEM_PROMPT, buildUserMessage } from '../core/prompt.mjs';
 import { EMPTY_PROPOSAL } from '../core/schema.mjs';
-import { CASES } from './cases.mjs';
+import { CASES as MAIN_CASES, HELDOUT } from './cases.mjs';
+// ASSISTANT_EVAL_SET=heldout 이면 따로 떼어 둔 사례만 돌린다(cases.mjs 의 설명 참고).
+const CASES = process.env.ASSISTANT_EVAL_SET === 'heldout' ? HELDOUT : MAIN_CASES;
 import { grade } from './grade.mjs';
 
 const MOCK = process.env.ASSISTANT_EVAL_MOCK;
@@ -211,6 +213,7 @@ async function runCase(c, ctx) {
     ],
     model: r.model, usage: r.usage, stop_reason: r.stop_reason,
     requests: r.usage?.requests, // 고르기 방식은 사례 하나에 여러 번 묻는다
+    route: MOCK ? 'mock' : routeOf(model),
   };
 }
 
@@ -222,7 +225,7 @@ async function gradeCase(c, run, ref, ctx) {
 }
 
 /** Side-channel perf fields beyond the built-ins (latency_s etc.). */
-function perfFrom(run) { return { refused: run.refused ? 1 : 0, requests: run.requests ?? 1 }; }
+function perfFrom(run) { return { refused: run.refused ? 1 : 0, requests: run.requests ?? 1, route: run.route, set: process.env.ASSISTANT_EVAL_SET === 'heldout' ? 'heldout' : 'main' }; }
 
 // --- harness (you usually won't need to touch below this line) --------------
 

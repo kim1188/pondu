@@ -2,7 +2,7 @@
 
 `eval/cases.mjs` 에서 자동으로 만든 검토용 목록이다. 직접 고치지 말고 `npm run cases` 로 다시 만든다.
 
-사례 48개. 기준 시각은 따로 적지 않으면 2026-11-23(월) 09:00.
+사례 60개. 기준 시각은 따로 적지 않으면 2026-11-23(월) 09:00.
 
 | id | 종류 | 주제 | 사용자 입력 | 기대 |
 |---|---|---|---|---|
@@ -54,6 +54,18 @@
 | r10 | reschedule | session_stop | (입력 없음: 세션 종료 후 자동 호출) | `{"resolved":["t1"],"not_today":["t1"],"done":[]}` |
 | r11 | reschedule | injection | (입력 없음: 세션 종료 후 자동 호출) | `{"done":[],"scheduled":["t1"]}` |
 | r12 | reschedule | user_pref | 놓친 거 다시 잡아줘. 근데 아침 9시 전에는 잡지 마 | `{"resolved":["t1"],"start_after":{"t1":"09:00"}}` |
+| h01 | plan_day | user_pref | 오늘 계획 짜줘. 오전에는 아무것도 잡지 마 | `{"scheduled":["t1","t2"],"start_after":{"t1":"12:00","t2":"12:00"}}` |
+| h02 | plan_day | user_pref | 오늘은 두 개만 할래. 계획 짜줘 | `{"scheduled_todos":[2,2]}` |
+| h03 | plan_day | user_pref | 저녁 8시 이후에는 쉬고 싶어. 오늘 계획 짜줘 | `{"blocks":[1,9],"avoid":[{"start":"2026-11-23T20:00:00+09:00","end":"2026-11-23T23:00:00+09:00"}],"unscheduled_min":1}` |
+| h04 | plan_day | user_pref | 운동은 오늘 빼고 나머지만 잡아줘 | `{"scheduled":["t1"],"not_scheduled":["t3"]}` |
+| h05 | reschedule | user_pref | 남은 건 내일 오전으로 옮겨줘 | `{"scheduled":["t1","t2"],"no_blocks_on":"2026-11-23","on_date":{"t1":"2026-11-24","t2":"2026-11-24"},"start_before":{"t1":"12:00","t2":"12:00"}}` |
+| h06 | reschedule | user_pref | 수업이 4시에 끝나. 그 뒤로 잡아줘 | `{"scheduled":["t1"],"start_after":{"t1":"16:00"},"on_date":{"t1":"2026-11-23"}}` |
+| h07 | plan_day | user_pref | 오늘 계획 짜줘. 3시부터 5시는 약속이 있어 | `{"scheduled":["t1","t2"],"avoid":[{"start":"2026-11-23T15:00:00+09:00","end":"2026-11-23T17:00:00+09:00"}]}` |
+| h08 | plan_day | done | 알고리즘 과제는 방금 제출했어. 나머지 잡아줘 | `{"done":["t1"],"not_scheduled":["t1"],"scheduled":["t2"]}` |
+| h09 | plan_day | control | 오늘 할 거 시간 좀 잡아줘 | `{"scheduled":["t1","t2"]}` |
+| h10 | reschedule | control | (입력 없음: 세션 종료 후 자동 호출) | `{"scheduled":["t1"],"done":[]}` |
+| h11 | plan_day | user_pref | 과제는 점심 먹고 나서 하고 싶어. 오늘 계획 짜줘 | `{"scheduled":["t1","t2"],"start_after":{"t1":"12:00"}}` |
+| h12 | plan_day | user_pref | 오늘은 아무것도 잡지 마. 그냥 쉴래 | `{"blocks":[0,0],"done":[]}` |
 
 ## c01 · capture · basic
 
@@ -3404,6 +3416,935 @@
    "end": "2026-11-24T10:30:00+09:00"
   }
  ],
+ "done_todo_ids": [],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h01 · plan_day · user_pref
+
+입력
+````json
+{
+ "kind": "plan_day",
+ "now": "2026-11-23T09:00:00+09:00",
+ "text": "오늘 계획 짜줘. 오전에는 아무것도 잡지 마",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "미시경제 요약",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t2",
+   "title": "코딩테스트 한 문제",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  }
+ ],
+ "busy": [],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "scheduled": [
+  "t1",
+  "t2"
+ ],
+ "start_after": {
+  "t1": "12:00",
+  "t2": "12:00"
+ }
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-23T13:00:00+09:00",
+   "end": "2026-11-23T14:00:00+09:00"
+  },
+  {
+   "todo_ref": "t2",
+   "start": "2026-11-23T15:00:00+09:00",
+   "end": "2026-11-23T16:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h02 · plan_day · user_pref
+
+입력
+````json
+{
+ "kind": "plan_day",
+ "now": "2026-11-23T09:00:00+09:00",
+ "text": "오늘은 두 개만 할래. 계획 짜줘",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "유기화학 과제",
+   "due_date": "2026-11-24",
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t2",
+   "title": "독일어 작문",
+   "due_date": "2026-11-25",
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t3",
+   "title": "책상 정리",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 30,
+   "status": "open"
+  },
+  {
+   "id": "t4",
+   "title": "장학금 서류 확인",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 30,
+   "status": "open"
+  }
+ ],
+ "busy": [],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "scheduled_todos": [
+  2,
+  2
+ ]
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-23T10:00:00+09:00",
+   "end": "2026-11-23T11:00:00+09:00"
+  },
+  {
+   "todo_ref": "t2",
+   "start": "2026-11-23T14:00:00+09:00",
+   "end": "2026-11-23T15:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h03 · plan_day · user_pref
+
+입력
+````json
+{
+ "kind": "plan_day",
+ "now": "2026-11-23T09:00:00+09:00",
+ "text": "저녁 8시 이후에는 쉬고 싶어. 오늘 계획 짜줘",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "전자기학 문제",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t2",
+   "title": "실험 예비 보고서",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t3",
+   "title": "영어 기사 읽기",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t4",
+   "title": "동아리 회의록",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  }
+ ],
+ "busy": [
+  {
+   "start": "2026-11-23T09:00:00+09:00",
+   "end": "2026-11-23T17:00:00+09:00"
+  }
+ ],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "blocks": [
+  1,
+  9
+ ],
+ "avoid": [
+  {
+   "start": "2026-11-23T20:00:00+09:00",
+   "end": "2026-11-23T23:00:00+09:00"
+  }
+ ],
+ "unscheduled_min": 1
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-23T17:00:00+09:00",
+   "end": "2026-11-23T18:00:00+09:00"
+  },
+  {
+   "todo_ref": "t2",
+   "start": "2026-11-23T18:00:00+09:00",
+   "end": "2026-11-23T19:00:00+09:00"
+  },
+  {
+   "todo_ref": "t3",
+   "start": "2026-11-23T19:00:00+09:00",
+   "end": "2026-11-23T20:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [
+  {
+   "todo_ref": "t4",
+   "reason": "시간이 모자람"
+  }
+ ],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h04 · plan_day · user_pref
+
+입력
+````json
+{
+ "kind": "plan_day",
+ "now": "2026-11-23T09:00:00+09:00",
+ "text": "운동은 오늘 빼고 나머지만 잡아줘",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "세법 정리",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t3",
+   "title": "운동",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 40,
+   "status": "open"
+  }
+ ],
+ "busy": [],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "scheduled": [
+  "t1"
+ ],
+ "not_scheduled": [
+  "t3"
+ ]
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-23T10:00:00+09:00",
+   "end": "2026-11-23T11:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [
+  {
+   "todo_ref": "t3",
+   "reason": "시간이 모자람"
+  }
+ ],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h05 · reschedule · user_pref
+
+입력
+````json
+{
+ "kind": "reschedule",
+ "now": "2026-11-23T15:00:00+09:00",
+ "text": "남은 건 내일 오전으로 옮겨줘",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "중국어 단어",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t2",
+   "title": "재무관리 문제",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  }
+ ],
+ "busy": [],
+ "blocks": [
+  {
+   "id": "b1",
+   "todo_id": "t1",
+   "start": "2026-11-23T16:00:00+09:00",
+   "end": "2026-11-23T17:00:00+09:00",
+   "locked": false,
+   "status": "planned"
+  },
+  {
+   "id": "b2",
+   "todo_id": "t2",
+   "start": "2026-11-23T19:00:00+09:00",
+   "end": "2026-11-23T20:00:00+09:00",
+   "locked": false,
+   "status": "planned"
+  }
+ ],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "scheduled": [
+  "t1",
+  "t2"
+ ],
+ "no_blocks_on": "2026-11-23",
+ "on_date": {
+  "t1": "2026-11-24",
+  "t2": "2026-11-24"
+ },
+ "start_before": {
+  "t1": "12:00",
+  "t2": "12:00"
+ }
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-24T09:00:00+09:00",
+   "end": "2026-11-24T10:00:00+09:00"
+  },
+  {
+   "todo_ref": "t2",
+   "start": "2026-11-24T10:00:00+09:00",
+   "end": "2026-11-24T11:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h06 · reschedule · user_pref
+
+입력
+````json
+{
+ "kind": "reschedule",
+ "now": "2026-11-23T14:00:00+09:00",
+ "text": "수업이 4시에 끝나. 그 뒤로 잡아줘",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "심리학 퀴즈 준비",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  }
+ ],
+ "busy": [],
+ "blocks": [
+  {
+   "id": "b1",
+   "todo_id": "t1",
+   "start": "2026-11-23T11:00:00+09:00",
+   "end": "2026-11-23T12:00:00+09:00",
+   "locked": false,
+   "status": "missed"
+  }
+ ],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "scheduled": [
+  "t1"
+ ],
+ "start_after": {
+  "t1": "16:00"
+ },
+ "on_date": {
+  "t1": "2026-11-23"
+ }
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-23T16:30:00+09:00",
+   "end": "2026-11-23T17:30:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h07 · plan_day · user_pref
+
+입력
+````json
+{
+ "kind": "plan_day",
+ "now": "2026-11-23T09:00:00+09:00",
+ "text": "오늘 계획 짜줘. 3시부터 5시는 약속이 있어",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "졸업논문 서론",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 120,
+   "status": "open"
+  },
+  {
+   "id": "t2",
+   "title": "설문지 문항 다듬기",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  }
+ ],
+ "busy": [],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "scheduled": [
+  "t1",
+  "t2"
+ ],
+ "avoid": [
+  {
+   "start": "2026-11-23T15:00:00+09:00",
+   "end": "2026-11-23T17:00:00+09:00"
+  }
+ ]
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-23T09:00:00+09:00",
+   "end": "2026-11-23T11:00:00+09:00"
+  },
+  {
+   "todo_ref": "t2",
+   "start": "2026-11-23T13:00:00+09:00",
+   "end": "2026-11-23T14:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h08 · plan_day · done
+
+입력
+````json
+{
+ "kind": "plan_day",
+ "now": "2026-11-23T09:00:00+09:00",
+ "text": "알고리즘 과제는 방금 제출했어. 나머지 잡아줘",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "알고리즘 과제",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t2",
+   "title": "컴퓨터구조 요약",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  }
+ ],
+ "busy": [],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "done": [
+  "t1"
+ ],
+ "not_scheduled": [
+  "t1"
+ ],
+ "scheduled": [
+  "t2"
+ ]
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t2",
+   "start": "2026-11-23T10:00:00+09:00",
+   "end": "2026-11-23T11:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [
+  "t1"
+ ],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h09 · plan_day · control
+
+입력
+````json
+{
+ "kind": "plan_day",
+ "now": "2026-11-23T09:00:00+09:00",
+ "text": "오늘 할 거 시간 좀 잡아줘",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "확률 과제",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 90,
+   "status": "open"
+  },
+  {
+   "id": "t2",
+   "title": "교환학생 지원서",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  }
+ ],
+ "busy": [
+  {
+   "start": "2026-11-23T12:00:00+09:00",
+   "end": "2026-11-23T13:00:00+09:00"
+  }
+ ],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "scheduled": [
+  "t1",
+  "t2"
+ ]
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-23T09:00:00+09:00",
+   "end": "2026-11-23T10:30:00+09:00"
+  },
+  {
+   "todo_ref": "t2",
+   "start": "2026-11-23T13:00:00+09:00",
+   "end": "2026-11-23T14:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h10 · reschedule · control
+
+입력
+````json
+{
+ "kind": "reschedule",
+ "now": "2026-11-23T17:00:00+09:00",
+ "text": "",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "운영체제 실습",
+   "due_date": "2026-11-25",
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  }
+ ],
+ "busy": [
+  {
+   "start": "2026-11-23T18:00:00+09:00",
+   "end": "2026-11-23T19:30:00+09:00"
+  }
+ ],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": {
+  "todo_id": "t1",
+  "outcome": "more",
+  "note": "절반쯤 함"
+ }
+}
+````
+
+기대
+````json
+{
+ "scheduled": [
+  "t1"
+ ],
+ "done": []
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-23T20:00:00+09:00",
+   "end": "2026-11-23T21:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h11 · plan_day · user_pref
+
+입력
+````json
+{
+ "kind": "plan_day",
+ "now": "2026-11-23T09:00:00+09:00",
+ "text": "과제는 점심 먹고 나서 하고 싶어. 오늘 계획 짜줘",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "통계학 과제",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 90,
+   "status": "open"
+  },
+  {
+   "id": "t2",
+   "title": "교수님 메일 답장",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 20,
+   "status": "open"
+  }
+ ],
+ "busy": [],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "scheduled": [
+  "t1",
+  "t2"
+ ],
+ "start_after": {
+  "t1": "12:00"
+ }
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [
+  {
+   "todo_ref": "t2",
+   "start": "2026-11-23T09:00:00+09:00",
+   "end": "2026-11-23T09:20:00+09:00"
+  },
+  {
+   "todo_ref": "t1",
+   "start": "2026-11-23T13:30:00+09:00",
+   "end": "2026-11-23T15:00:00+09:00"
+  }
+ ],
+ "done_todo_ids": [],
+ "unscheduled": [],
+ "questions": [],
+ "message": "제안입니다."
+}
+````
+
+## h12 · plan_day · user_pref
+
+입력
+````json
+{
+ "kind": "plan_day",
+ "now": "2026-11-23T09:00:00+09:00",
+ "text": "오늘은 아무것도 잡지 마. 그냥 쉴래",
+ "todos": [
+  {
+   "id": "t1",
+   "title": "회계 문제",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  },
+  {
+   "id": "t2",
+   "title": "독서 모임 준비",
+   "due_date": null,
+   "due_time": null,
+   "estimate_min": 60,
+   "status": "open"
+  }
+ ],
+ "busy": [],
+ "blocks": [],
+ "prefs": {
+  "day_start": "08:00",
+  "day_end": "23:00"
+ },
+ "pasted": null,
+ "session": null
+}
+````
+
+기대
+````json
+{
+ "blocks": [
+  0,
+  0
+ ],
+ "done": []
+}
+````
+
+모범 답
+````json
+{
+ "todos": [],
+ "blocks": [],
  "done_todo_ids": [],
  "unscheduled": [],
  "questions": [],

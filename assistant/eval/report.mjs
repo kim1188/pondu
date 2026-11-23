@@ -52,7 +52,9 @@ const runs = variants.map(v => {
     reps: cases ? Math.round(rows.length / cases) : 0,
     seconds: ok.length ? ok.reduce((a, r) => a + (r.latency_s ?? 0), 0) / ok.length : 0,
     cost: price ? (input * price[0] + output * price[1]) / 1e6 : null,
-    harness: cases <= 28 ? '고르기' : '채팅',
+    // 새 실행은 경로와 사례 묶음을 행에 적는다. 예전 실행은 사례 수로 짐작한다.
+    harness: rows[0]?.route ? (['decisions', 'chat-decide'].includes(rows[0].route) ? '고르기' : '채팅') : (cases <= 28 ? '고르기' : '채팅'),
+    set: rows[0]?.set === 'heldout' ? '따로' : '기본',
   };
 });
 
@@ -71,16 +73,17 @@ if (one) {
 
 if (!flag('--fails')) {
   console.log(`결과 폴더: ${flow}\n`);
-  const head = ['실행', '모델', '방식', '사례×회', '통과', '규칙', '기한', '완료', '평균초', '호출', '입력토큰', '출력토큰', '비용', '오류'];
-  const width = [9, 20, 7, 8, 8, 8, 8, 8, 7, 6, 9, 9, 9, 4];
+  const head = ['실행', '모델', '방식', '묶음', '사례×회', '통과', '규칙', '기한', '완료', '평균초', '호출', '입력토큰', '출력토큰', '비용', '오류'];
+  const width = [9, 20, 7, 5, 8, 8, 8, 8, 8, 7, 6, 9, 9, 9, 4];
   const line = cells => cells.map((c, i) => pad(c, width[i])).join(' ');
   console.log(line(head));
   for (const r of runs) {
-    console.log(line([r.v, r.model, r.harness, `${r.cases}×${r.reps}`, pct(r.ok, 'pass'), pct(r.ok, 'rules_ok'), pct(r.ok, 'no_invented_due'),
+    console.log(line([r.v, r.model, r.harness, r.set, `${r.cases}×${r.reps}`, pct(r.ok, 'pass'), pct(r.ok, 'rules_ok'), pct(r.ok, 'no_invented_due'),
       pct(r.ok, 'no_false_done'), r.seconds.toFixed(1), r.requests, r.input, r.output, r.cost == null ? '?' : '$' + r.cost.toFixed(3), r.errors.length]));
   }
   console.log('\n통과: 규칙과 기대를 모두 만족 | 규칙: 규칙 위반 없음 | 기한: 말하지 않은 기한을 만들지 않음 | 완료: 거짓 완료 없음');
   console.log('방식: 채팅 = 48건 전부, 고르기 = 배치 28건만(서로 다른 사례 묶음이라 통과율을 그대로 견주면 안 된다)');
+  console.log('묶음: 기본 = 처음부터 있던 사례, 따로 = 하네스를 고친 뒤 새로 쓴 사례(배치 12건, 두 방식 모두 같은 사례)');
   if (runs.some(r => r.cost == null)) console.log('비용 ?: 그 모델의 가격을 모른다. --price 모델=입력/출력 으로 주면 계산한다(100만 토큰당 달러)');
   const truncated = runs.reduce((a, r) => a + r.rows.length - r.ok.length, 0);
   if (truncated) console.log(`잘린 응답 ${truncated}건은 통과율에서 뺐다`);

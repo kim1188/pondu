@@ -275,3 +275,82 @@ export const CASES = [
   }, { resolved: ['t1'], start_after: { t1: '09:00' } },
     P({ blocks: [B('t1', D.tue, '09:30', '10:30')] })),
 ];
+
+// ───────── 따로 떼어 둔 사례(held-out) ─────────
+// 고르기 방식의 "사용자의 말에 비춘 점검" 단계는 p09, p16 의 실패를 보고 만들었다. 같은 사례로 다시 재면
+// 그 사례에 맞춘 것인지 일반적으로 듣는 것인지 알 수 없다. 아래는 그 단계를 만든 뒤에, 다른 말투와 다른 종류의
+// 제한으로 새로 쓴 사례다. 프롬프트나 하네스를 고칠 때 이 사례의 실패를 보고 고치지 않는다(보면 더는 held-out 이 아니다).
+// 실행: ASSISTANT_EVAL_SET=heldout
+export const HELDOUT = [
+  mk('h01', 'plan_day', 'user_pref', {
+    text: '오늘 계획 짜줘. 오전에는 아무것도 잡지 마',
+    todos: [todo('t1', '미시경제 요약', { estimate_min: 60 }), todo('t2', '코딩테스트 한 문제', { estimate_min: 60 })],
+  }, { scheduled: ['t1', 't2'], start_after: { t1: '12:00', t2: '12:00' } },
+    P({ blocks: [B('t1', D.mon, '13:00', '14:00'), B('t2', D.mon, '15:00', '16:00')] })),
+  mk('h02', 'plan_day', 'user_pref', {
+    text: '오늘은 두 개만 할래. 계획 짜줘',
+    todos: [todo('t1', '유기화학 과제', { estimate_min: 60, due_date: D.tue }), todo('t2', '독일어 작문', { estimate_min: 60, due_date: D.wed }),
+            todo('t3', '책상 정리', { estimate_min: 30 }), todo('t4', '장학금 서류 확인', { estimate_min: 30 })],
+  }, { scheduled_todos: [2, 2] },
+    P({ blocks: [B('t1', D.mon, '10:00', '11:00'), B('t2', D.mon, '14:00', '15:00')] })),
+  mk('h03', 'plan_day', 'user_pref', {
+    text: '저녁 8시 이후에는 쉬고 싶어. 오늘 계획 짜줘',
+    busy: [win(D.mon, '09:00', '17:00')],
+    todos: [todo('t1', '전자기학 문제', { estimate_min: 60 }), todo('t2', '실험 예비 보고서', { estimate_min: 60 }),
+            todo('t3', '영어 기사 읽기', { estimate_min: 60 }), todo('t4', '동아리 회의록', { estimate_min: 60 })],
+  }, { blocks: [1, 9], avoid: [win(D.mon, '20:00', '23:00')], unscheduled_min: 1 },
+    P({ blocks: [B('t1', D.mon, '17:00', '18:00'), B('t2', D.mon, '18:00', '19:00'), B('t3', D.mon, '19:00', '20:00')], unscheduled: [U('t4')] })),
+  mk('h04', 'plan_day', 'user_pref', {
+    text: '운동은 오늘 빼고 나머지만 잡아줘',
+    todos: [todo('t1', '세법 정리', { estimate_min: 60 }), todo('t3', '운동', { estimate_min: 40 })],
+  }, { scheduled: ['t1'], not_scheduled: ['t3'] },
+    P({ blocks: [B('t1', D.mon, '10:00', '11:00')], unscheduled: [U('t3')] })),
+  mk('h05', 'reschedule', 'user_pref', {
+    now: at(D.mon, '15:00'), text: '남은 건 내일 오전으로 옮겨줘',
+    blocks: [
+      { id: 'b1', todo_id: 't1', start: at(D.mon, '16:00'), end: at(D.mon, '17:00'), locked: false, status: 'planned' },
+      { id: 'b2', todo_id: 't2', start: at(D.mon, '19:00'), end: at(D.mon, '20:00'), locked: false, status: 'planned' },
+    ],
+    todos: [todo('t1', '중국어 단어', { estimate_min: 60 }), todo('t2', '재무관리 문제', { estimate_min: 60 })],
+  }, { scheduled: ['t1', 't2'], no_blocks_on: D.mon, on_date: { t1: D.tue, t2: D.tue }, start_before: { t1: '12:00', t2: '12:00' } },
+    P({ blocks: [B('t1', D.tue, '09:00', '10:00'), B('t2', D.tue, '10:00', '11:00')] })),
+  mk('h06', 'reschedule', 'user_pref', {
+    now: at(D.mon, '14:00'), text: '수업이 4시에 끝나. 그 뒤로 잡아줘',
+    blocks: [{ id: 'b1', todo_id: 't1', start: at(D.mon, '11:00'), end: at(D.mon, '12:00'), locked: false, status: 'missed' }],
+    todos: [todo('t1', '심리학 퀴즈 준비', { estimate_min: 60 })],
+  }, { scheduled: ['t1'], start_after: { t1: '16:00' }, on_date: { t1: D.mon } },
+    P({ blocks: [B('t1', D.mon, '16:30', '17:30')] })),
+  mk('h07', 'plan_day', 'user_pref', {
+    text: '오늘 계획 짜줘. 3시부터 5시는 약속이 있어',
+    todos: [todo('t1', '졸업논문 서론', { estimate_min: 120 }), todo('t2', '설문지 문항 다듬기', { estimate_min: 60 })],
+  }, { scheduled: ['t1', 't2'], avoid: [win(D.mon, '15:00', '17:00')] },
+    P({ blocks: [B('t1', D.mon, '09:00', '11:00'), B('t2', D.mon, '13:00', '14:00')] })),
+  mk('h08', 'plan_day', 'done', {
+    text: '알고리즘 과제는 방금 제출했어. 나머지 잡아줘',
+    todos: [todo('t1', '알고리즘 과제', { estimate_min: 60 }), todo('t2', '컴퓨터구조 요약', { estimate_min: 60 })],
+  }, { done: ['t1'], not_scheduled: ['t1'], scheduled: ['t2'] },
+    P({ done_todo_ids: ['t1'], blocks: [B('t2', D.mon, '10:00', '11:00')] })),
+  mk('h09', 'plan_day', 'control', {
+    text: '오늘 할 거 시간 좀 잡아줘',
+    busy: [win(D.mon, '12:00', '13:00')],
+    todos: [todo('t1', '확률 과제', { estimate_min: 90 }), todo('t2', '교환학생 지원서', { estimate_min: 60 })],
+  }, { scheduled: ['t1', 't2'] },
+    P({ blocks: [B('t1', D.mon, '09:00', '10:30'), B('t2', D.mon, '13:00', '14:00')] })),
+  mk('h10', 'reschedule', 'control', {
+    now: at(D.mon, '17:00'),
+    session: { todo_id: 't1', outcome: 'more', note: '절반쯤 함' },
+    busy: [win(D.mon, '18:00', '19:30')],
+    todos: [todo('t1', '운영체제 실습', { estimate_min: 60, due_date: D.wed })],
+  }, { scheduled: ['t1'], done: [] },
+    P({ blocks: [B('t1', D.mon, '20:00', '21:00')] })),
+  mk('h11', 'plan_day', 'user_pref', {
+    text: '과제는 점심 먹고 나서 하고 싶어. 오늘 계획 짜줘',
+    todos: [todo('t1', '통계학 과제', { estimate_min: 90 }), todo('t2', '교수님 메일 답장', { estimate_min: 20 })],
+  }, { scheduled: ['t1', 't2'], start_after: { t1: '12:00' } },
+    P({ blocks: [B('t2', D.mon, '09:00', '09:20'), B('t1', D.mon, '13:30', '15:00')] })),
+  mk('h12', 'plan_day', 'user_pref', {
+    text: '오늘은 아무것도 잡지 마. 그냥 쉴래',
+    todos: [todo('t1', '회계 문제', { estimate_min: 60 }), todo('t2', '독서 모임 준비', { estimate_min: 60 })],
+  }, { blocks: [0, 0], done: [] },
+    P()),
+];
