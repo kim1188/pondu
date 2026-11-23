@@ -61,14 +61,15 @@ language sql stable security definer set search_path = public as $$
   )
 $$;
 
--- 사용자가 그 크루의 활동 중인 구성원인가.
-create or replace function social_in_crew(p_user uuid, p_group uuid) returns boolean
+create or replace function social_share_crew(p_a uuid, p_b uuid) returns boolean
 language sql stable security definer set search_path = public as $$
-  select p_group is not null and exists (
+  select exists (
     select 1
-    from group_members m
-    join groups g on g.id = m.group_id and g.kind = 'crew'
-    where m.group_id = p_group and m.user_id = p_user and m.status = 'active'
+    from group_members m1
+    join groups g on g.id = m1.group_id and g.kind = 'crew'
+    join group_members m2 on m2.group_id = m1.group_id
+    where m1.user_id = p_a and m1.status = 'active'
+      and m2.user_id = p_b and m2.status = 'active'
   )
 $$;
 
@@ -80,7 +81,6 @@ $$;
 -- ── can_view_session (내부) ──
 -- 본인 것이면 항상. 그 외에는 종료 확인 필요가 아니고, 공개 범위가 friends/crew이고,
 -- 차단 관계가 아니고, 내가 신고하지 않았고, 관계가 맞을 때만.
--- crew 공개: 작성자와 친구이거나, 보는 사람과 작성자가 둘 다 그 세션의 group_id 크루의 활동 중인 구성원.
 create or replace function can_view_session(p_viewer uuid, p_session_id uuid) returns boolean
 language plpgsql stable security definer set search_path = public as $$
 declare s sessions%rowtype; friend boolean;
@@ -96,7 +96,7 @@ begin
   end if;
   friend := social_are_friends(p_viewer, s.user_id);
   if s.visibility = 'friends' then return friend; end if;
-  return friend or (social_in_crew(p_viewer, s.group_id) and social_in_crew(s.user_id, s.group_id));
+  return friend or social_share_crew(p_viewer, s.user_id);
 end $$;
 
 -- ── 친구 ──
@@ -107,13 +107,7 @@ begin
   perform social_school(me);
   if p_user_id is null or p_user_id = me then perform social_err('invalid_input'); end if;
   if not exists (select 1 from profiles where id = p_user_id) then perform social_err('not_found'); end if;
-  -- 내가 차단한 상대에게만 blocked. 상대가 나를 차단했으면 드러나지 않게 아무 일 없이 성공한다.
-  if exists (select 1 from blocks where blocker_id = me and blocked_id = p_user_id) then
-    perform social_err('blocked');
-  end if;
-  if exists (select 1 from blocks where blocker_id = p_user_id and blocked_id = me) then
-    return null;
-  end if;
+  if social_is_blocked(me, p_user_id) then perform social_err('blocked'); end if;
 
   select * into f from friendships
    where user_a = least(me, p_user_id) and user_b = greatest(me, p_user_id);
@@ -122,16 +116,8 @@ begin
     if f.requested_by = me then return null; end if;      -- 이미 보냄: 그대로 둔다
     -- 상대가 먼저 보냈으면 곧 수락으로 본다
     update friendships set status = 'accepted' where user_a = f.user_a and user_b = f.user_b;
-    delete from friend_request_rejections where requester_id in (me, p_user_id) and target_id in (me, p_user_id);
     perform social_notify(p_user_id, 'friend_accepted', jsonb_build_object('user_id', me));
     return null;
-  end if;
-
-  -- 거절당한 지 7일이 안 지났으면 다시 보낼 수 없다.
-  if exists (select 1 from friend_request_rejections
-              where requester_id = me and target_id = p_user_id
-                and rejected_at > now() - interval '7 days') then
-    perform social_err('rate_limited');
   end if;
 
   insert into friendships (user_a, user_b, status, requested_by)
@@ -152,7 +138,6 @@ begin
        and status = 'pending' and requested_by = p_user_id;
     get diagnostics n = row_count;
     if n = 0 then perform social_err('request_not_found'); end if;
-    delete from friend_request_rejections where requester_id in (me, p_user_id) and target_id in (me, p_user_id);
     perform social_notify(p_user_id, 'friend_accepted', jsonb_build_object('user_id', me));
   else
     delete from friendships
@@ -160,8 +145,6 @@ begin
        and status = 'pending' and requested_by = p_user_id;
     get diagnostics n = row_count;
     if n = 0 then perform social_err('request_not_found'); end if;
-    insert into friend_request_rejections (requester_id, target_id) values (p_user_id, me)
-    on conflict (requester_id, target_id) do update set rejected_at = now();
   end if;
   return null;
 end $$;
@@ -290,28 +273,6 @@ begin
   return social_crew_json(g.id, me);
 end $$;
 
--- 운영자만. 새 코드로 바꾸고 예전 코드는 곧바로 쓸 수 없다.
-create or replace function rotate_invite_code(p_group_id uuid) returns jsonb
-language plpgsql security definer set search_path = public as $$
-declare me uuid := social_uid(); code text;
-begin
-  if p_group_id is null then perform social_err('invalid_input'); end if;
-  if not exists (select 1 from group_members
-                  where group_id = p_group_id and user_id = me and status = 'active' and role = 'owner') then
-    perform social_err('forbidden');
-  end if;
-  perform 1 from groups where id = p_group_id for update;
-  loop
-    code := upper(encode(gen_random_bytes(8), 'hex'));
-    begin
-      update groups set invite_code = code where id = p_group_id;
-      exit;
-    exception when unique_violation then null;
-    end;
-  end loop;
-  return social_crew_json(p_group_id, me);
-end $$;
-
 create or replace function leave_crew(p_group_id uuid) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare me uuid := social_uid(); m group_members%rowtype; heir uuid;
@@ -404,9 +365,7 @@ begin
       'session_id', s.id,
       'author', profile_card(s.user_id),
       'thread_id', s.thread_id,
-      'group_id', gr.gid,
-      'group_name', gr.gname,
-      'share_title', s.share_title,
+      'share_title', coalesce(s.share_title, s.primary_category::text),
       'primary_category', s.primary_category,
       'started_at', social_iso(s.started_at),
       'ended_at', social_iso(s.ended_at),
@@ -433,11 +392,6 @@ begin
   join sessions s on s.id = o.id
   left join rx on rx.session_id = s.id
   left join cm on cm.session_id = s.id
-  -- 크루 이름은 그 크루의 구성원에게만 보인다(친구에게는 드러나지 않는다)
-  left join lateral (
-    select g.id as gid, g.name as gname from groups g
-    where g.id = s.group_id and s.visibility = 'crew' and social_in_crew(p_viewer, g.id)
-  ) gr on true
   );
 end $$;
 
@@ -449,7 +403,6 @@ declare
   lim int := coalesce(p_limit, 20);
   c_rank int; c_ts timestamptz; c_id uuid;
   grp boolean := p_group_id is not null;
-  mine uuid[];
   ids uuid[]; page uuid[]; nxt text; last_s sessions%rowtype;
 begin
   if lim < 1 or lim > 50 then perform social_err('invalid_input'); end if;
@@ -467,10 +420,6 @@ begin
                           where group_id = p_group_id and user_id = me and status = 'active') then
     perform social_err('forbidden');
   end if;
-
-  select coalesce(array_agg(m.group_id), '{}') into mine
-    from group_members m join groups g on g.id = m.group_id and g.kind = 'crew'
-   where m.user_id = me and m.status = 'active';
 
   with authors as (
     select uid, bool_or(is_friend) as is_friend
@@ -503,11 +452,7 @@ begin
       where s.user_id = a.uid
         and s.visibility in ('friends', 'crew') and s.status <> 'needs_confirmation'
         and s.status in ('live', 'paused')
-        and case when grp then s.visibility = 'crew' and s.group_id = p_group_id
-                 else (s.visibility = 'friends' and a.is_friend)
-                   or (s.visibility = 'crew'
-                       and (a.is_friend or (s.group_id = any (mine) and social_in_crew(s.user_id, s.group_id))))
-            end
+        and (s.visibility = 'crew' or (not grp and a.is_friend))
         and (c_rank is null or c_rank = 0) and (c_ts is null or (s.started_at, s.id) < (c_ts, c_id))
         and not exists (select 1 from reports r where r.reporter_id = me and r.session_id = s.id)
       order by s.started_at desc, s.id desc
@@ -521,11 +466,7 @@ begin
       where s.user_id = a.uid
         and s.visibility in ('friends', 'crew') and s.status <> 'needs_confirmation'
         and s.status = 'ended'
-        and case when grp then s.visibility = 'crew' and s.group_id = p_group_id
-                 else (s.visibility = 'friends' and a.is_friend)
-                   or (s.visibility = 'crew'
-                       and (a.is_friend or (s.group_id = any (mine) and social_in_crew(s.user_id, s.group_id))))
-            end
+        and (s.visibility = 'crew' or (not grp and a.is_friend))
         and (c_rank is null or c_rank = 0 or (s.started_at, s.id) < (c_ts, c_id))
         and not exists (select 1 from reports r where r.reporter_id = me and r.session_id = s.id)
       order by s.started_at desc, s.id desc
@@ -555,17 +496,24 @@ create or replace function get_thread_history(p_session_id uuid, p_limit int) re
 language plpgsql stable security definer set search_path = public as $$
 declare
   me uuid := social_uid(); lim int := coalesce(p_limit, 20);
-  s sessions%rowtype; ids uuid[];
+  s sessions%rowtype; friend boolean; mate boolean; ids uuid[];
 begin
   if lim < 1 or lim > 50 then perform social_err('invalid_input'); end if;
   if not can_view_session(me, p_session_id) then perform social_err('not_found'); end if;
   select * into s from sessions where id = p_session_id;
   if s.thread_id is null then return '[]'::jsonb; end if;
+  friend := social_are_friends(me, s.user_id);
+  mate := social_share_crew(me, s.user_id);
+
   select coalesce(array_agg(x.id order by x.started_at desc, x.id desc), '{}') into ids
   from (
     select t.id, t.started_at from sessions t
     where t.user_id = s.user_id and t.thread_id = s.thread_id and t.id <> s.id
-      and (me = s.user_id or can_view_session(me, t.id))
+      and (me = s.user_id
+           or (t.status <> 'needs_confirmation'
+               and ((t.visibility = 'friends' and friend)
+                    or (t.visibility = 'crew' and (friend or mate)))
+               and not exists (select 1 from reports r where r.reporter_id = me and r.session_id = t.id)))
     order by t.started_at desc, t.id desc
     limit lim
   ) x;
@@ -678,13 +626,13 @@ begin
             'respond_friend_request', 'remove_friend', 'block_user', 'unblock_user', 'list_friends',
             'list_friend_requests', 'create_crew', 'join_crew', 'leave_crew', 'remove_crew_member',
             'list_my_crews', 'list_crew_members', 'set_reaction', 'add_comment', 'list_comments',
-            'delete_comment', 'report_session', 'rotate_invite_code')
+            'delete_comment', 'report_session')
            or p.proname like 'social\_%')
   loop
     execute format('revoke all on function %s from public, anon, authenticated', r.sig);
     if r.proname in ('get_feed', 'get_thread_history', 'send_friend_request', 'respond_friend_request',
          'remove_friend', 'block_user', 'unblock_user', 'list_friends', 'list_friend_requests',
-         'create_crew', 'join_crew', 'rotate_invite_code', 'leave_crew', 'remove_crew_member', 'list_my_crews',
+         'create_crew', 'join_crew', 'leave_crew', 'remove_crew_member', 'list_my_crews',
          'list_crew_members', 'set_reaction', 'add_comment', 'list_comments', 'delete_comment',
          'report_session') then
       execute format('grant execute on function %s to authenticated', r.sig);

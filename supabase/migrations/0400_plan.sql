@@ -39,7 +39,7 @@ create or replace function plan_thread_json(p_t threads) returns jsonb
 language sql immutable set search_path = public as $$
   select jsonb_build_object('id', p_t.id, 'title', p_t.title, 'share_title', p_t.share_title,
     'primary_category', p_t.primary_category, 'default_visibility', p_t.default_visibility,
-    'default_group_id', p_t.default_group_id, 'archived_at', plan_ts(p_t.archived_at))
+    'archived_at', plan_ts(p_t.archived_at))
 $$;
 
 create or replace function plan_todo_json(p_t todos) returns jsonb
@@ -76,17 +76,6 @@ create or replace function plan_own_thread(p_user uuid, p_thread uuid) returns v
 language plpgsql set search_path = public as $$
 begin
   if p_thread is not null and not exists (select 1 from threads where id = p_thread and user_id = p_user) then
-    perform plan_fail('not_found');
-  end if;
-end $$;
-
--- 내가 활동 중인 구성원인 크루만 이어가는 일의 기본 크루가 될 수 있다. 아니면 not_found.
-create or replace function plan_own_crew(p_user uuid, p_group uuid) returns void
-language plpgsql set search_path = public as $$
-begin
-  if p_group is not null and not exists (
-       select 1 from group_members m join groups g on g.id = m.group_id and g.kind = 'crew'
-        where m.group_id = p_group and m.user_id = p_user and m.status = 'active') then
     perform plan_fail('not_found');
   end if;
 end $$;
@@ -165,16 +154,14 @@ exception when datetime_field_overflow or invalid_datetime_format then
 end $$;
 
 -- ── 이어가는 일 ──
-create or replace function create_thread(p_title text, p_primary_category category, p_share_title text, p_default_visibility visibility,
-  p_default_group_id uuid default null)
+create or replace function create_thread(p_title text, p_primary_category category, p_share_title text, p_default_visibility visibility)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_uid uuid := plan_uid(); v_row threads; v_vis visibility := coalesce(p_default_visibility, 'private');
 begin
   if p_title is null or p_primary_category is null then perform plan_fail('invalid_input'); end if;
   if v_vis in ('department', 'school') then perform plan_fail('visibility_not_available'); end if;
-  perform plan_own_crew(v_uid, p_default_group_id);
-  insert into threads (user_id, title, share_title, primary_category, default_visibility, default_group_id)
-  values (v_uid, btrim(p_title), nullif(btrim(p_share_title), ''), p_primary_category, v_vis, p_default_group_id)
+  insert into threads (user_id, title, share_title, primary_category, default_visibility)
+  values (v_uid, btrim(p_title), nullif(btrim(p_share_title), ''), p_primary_category, v_vis)
   returning * into v_row;
   return plan_thread_json(v_row);
 exception when check_violation or string_data_right_truncation then
@@ -187,7 +174,7 @@ declare v_uid uuid := plan_uid(); v_row threads;
 begin
   select * into v_row from threads where id = p_thread_id and user_id = v_uid for update;
   if not found then perform plan_fail('not_found'); end if;
-  perform plan_check_patch(p_patch, array['title', 'share_title', 'primary_category', 'default_visibility', 'default_group_id']);
+  perform plan_check_patch(p_patch, array['title', 'share_title', 'primary_category', 'default_visibility']);
   if p_patch ? 'title' then
     if jsonb_typeof(p_patch->'title') <> 'string' then perform plan_fail('invalid_input'); end if;
     v_row.title := btrim(p_patch->>'title');
@@ -205,14 +192,8 @@ begin
     v_row.default_visibility := (p_patch->>'default_visibility')::visibility;
     if v_row.default_visibility in ('department', 'school') then perform plan_fail('visibility_not_available'); end if;
   end if;
-  if p_patch ? 'default_group_id' then
-    if jsonb_typeof(p_patch->'default_group_id') not in ('string', 'null') then perform plan_fail('invalid_input'); end if;
-    v_row.default_group_id := (p_patch->>'default_group_id')::uuid;
-    perform plan_own_crew(v_uid, v_row.default_group_id);
-  end if;
   update threads set title = v_row.title, share_title = v_row.share_title,
-         primary_category = v_row.primary_category, default_visibility = v_row.default_visibility,
-         default_group_id = v_row.default_group_id
+         primary_category = v_row.primary_category, default_visibility = v_row.default_visibility
    where id = v_row.id returning * into v_row;
   return plan_thread_json(v_row);
 exception when check_violation or invalid_text_representation or string_data_right_truncation then
@@ -325,7 +306,7 @@ create or replace function import_todos(p_source text, p_items jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_uid uuid := plan_uid(); v_item jsonb; v_row todos; v_created jsonb := '[]'::jsonb;
-  v_n int := 0; v_done boolean; v_ref text; v_title text; v_due_at timestamptz; v_has_time boolean; v_dd text; v_dt text;
+  v_n int := 0; v_done boolean; v_ref text; v_title text;
 begin
   if p_source is null or btrim(p_source) = '' or char_length(p_source) > 40
      or p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) > 200 then
@@ -339,23 +320,11 @@ begin
     v_title := btrim(v_item->>'title');
     v_ref := nullif(v_item->>'source_ref', '');
     v_done := coalesce((v_item->>'done')::boolean, false);
-    -- 기한은 due_at(시각 값) 또는 due_date(+due_time, 한국 시간) 중 하나로만 준다.
-    v_dd := nullif(v_item->>'due_date', ''); v_dt := nullif(v_item->>'due_time', '');
-    if coalesce(jsonb_typeof(v_item->'due_date'), 'null') not in ('string', 'null')
-       or coalesce(jsonb_typeof(v_item->'due_time'), 'null') not in ('string', 'null')
-       or ((v_dd is not null or v_dt is not null) and v_item->>'due_at' is not null) then
-      perform plan_fail('invalid_input');
-    end if;
-    if v_dd is not null or v_dt is not null then
-      select f.due_at, f.has_time into v_due_at, v_has_time from plan_due_from_kst(v_dd, v_dt) f;
-    else
-      v_due_at := (v_item->>'due_at')::timestamptz;
-      v_has_time := v_due_at is not null and coalesce((v_item->>'due_has_time')::boolean, false);
-    end if;
     v_row := null;
     insert into todos (user_id, title, due_at, due_has_time, estimate_min, status, completed_at,
                        completion_source, source, source_ref)
-    values (v_uid, v_title, v_due_at, v_has_time,
+    values (v_uid, v_title, (v_item->>'due_at')::timestamptz,
+            case when v_item->>'due_at' is null then false else coalesce((v_item->>'due_has_time')::boolean, false) end,
             (v_item->>'estimate_min')::int,
             case when v_done then 'done'::todo_status else 'open'::todo_status end,
             case when v_done then now() end,
@@ -488,8 +457,6 @@ begin
   select * into v_prop from assistant_proposals where id = p_proposal_id and user_id = v_uid for update;
   if not found then perform plan_fail('proposal_not_found'); end if;
   if v_prop.applied_at is not null then perform plan_fail('proposal_already_applied'); end if;
-  -- 만든 지 24시간이 지난 제안은 없는 것과 같다.
-  if v_prop.created_at < now() - interval '24 hours' then perform plan_fail('proposal_not_found'); end if;
 
   v_todos := coalesce(v_prop.proposal->'todos', '[]'::jsonb);
   v_blocks := coalesce(v_prop.proposal->'blocks', '[]'::jsonb);
@@ -514,12 +481,6 @@ begin
     if exists (select 1 from unnest(v_bi) x where x is null or x < 0 or x >= v_nb) or array_position(p_block_indexes, null) is not null then
       perform plan_fail('invalid_input');
     end if;
-  end if;
-
-  -- 재배치는 전부 적용하거나 적용하지 않는다. 일부만 고르면 고르지 않은 기존 계획이 사라진다.
-  -- p_block_indexes 가 null 이면 전부를 뜻한다(계약 3절 D).
-  if v_prop.kind = 'reschedule' and coalesce(array_length(v_bi, 1), 0) <> v_nb then
-    perform plan_fail('invalid_input');
   end if;
 
   -- 1) 새 할 일 만들기
@@ -651,7 +612,7 @@ begin
 end $$;
 
 grant execute on function
-  create_thread(text, category, text, visibility, uuid), update_thread(uuid, jsonb), archive_thread(uuid), list_threads(),
+  create_thread(text, category, text, visibility), update_thread(uuid, jsonb), archive_thread(uuid), list_threads(),
   create_todo(text, uuid, timestamptz, boolean, int), update_todo(uuid, jsonb), set_todo_status(uuid, todo_status),
   delete_todo(uuid), import_todos(text, jsonb),
   create_plan_block(uuid, uuid, timestamptz, timestamptz, boolean), update_plan_block(uuid, jsonb), delete_plan_block(uuid),

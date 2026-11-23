@@ -62,7 +62,6 @@ create table threads (
   share_title text check (char_length(share_title) <= 60),
   primary_category category not null,
   default_visibility visibility not null default 'private',
-  default_group_id uuid,
   archived_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -134,7 +133,6 @@ create table sessions (
   share_title text check (char_length(share_title) <= 60),
   progress_note text check (char_length(progress_note) <= 200),
   visibility visibility not null default 'private',
-  group_id uuid,
   end_corrected boolean not null default false,
   offline_started_at timestamptz,
   created_at timestamptz not null default now(),
@@ -186,12 +184,6 @@ create table groups (
   created_at timestamptz not null default now()
 );
 
-alter table threads add constraint threads_default_group_fkey
-  foreign key (default_group_id) references groups on delete set null;
-alter table sessions add constraint sessions_group_fkey
-  foreign key (group_id) references groups on delete set null;
-create index sessions_group_idx on sessions (group_id, started_at desc) where group_id is not null;
-
 create table group_members (
   group_id uuid not null references groups on delete cascade,
   user_id uuid not null references profiles on delete cascade,
@@ -201,15 +193,6 @@ create table group_members (
   primary key (group_id, user_id)
 );
 create index group_members_user_idx on group_members (user_id, status);
-
--- 거절당한 친구 요청 기록(7일 동안 같은 상대에게 다시 요청하지 못하게 한다). 요청한 사람 기준.
-create table friend_request_rejections (
-  requester_id uuid not null references profiles on delete cascade,
-  target_id uuid not null references profiles on delete cascade,
-  rejected_at timestamptz not null default now(),
-  primary key (requester_id, target_id)
-);
-create index friend_request_rejections_target_idx on friend_request_rejections (target_id);
 
 create table reactions (
   session_id uuid not null references sessions on delete cascade,
