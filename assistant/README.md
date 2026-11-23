@@ -53,6 +53,21 @@ node assistant/eval/run-eval.mjs --flow .claude/hillclimb/assistant --variant ba
 cd assistant && npm install && npm run selftest && npm test
 ```
 
+## 결과 보기
+
+모델을 부르지 않고, 이미 있는 결과만 읽는다. 결과 폴더 안의 실행을 전부 찾아 보여 준다.
+
+```bash
+node assistant/eval/report.mjs /tmp/pondu-eval-flow
+```
+
+| 옵션 | 하는 일 |
+|---|---|
+| (없음) | 실행별 요약 표와 실패한 사례 |
+| `--fails` | 실패한 사례만, 입력 문장과 함께 |
+| `--case p09` | 한 사례가 실행마다 어땠는지 |
+| `--price gpt-6-luna=0.10/0` | 가격을 모르는 모델의 비용 계산(입력/출력, 100만 토큰당 달러). 여러 번 줄 수 있다 |
+
 ## 지표와 통과 기준
 
 | 지표 | 뜻 | 기준 |
