@@ -278,6 +278,7 @@ final class EstimateAskTests: XCTestCase {
         let model = AssistantModel(kind: .planDay, today: Fixture.makeModel(backend: backend), consent: consent)
         model.send()
         await model.waitUntilDone()
+        XCTAssertEqual(model.message, "오늘 계획이에요.")
         backend.streamEvents = [Fixture.sse("proposal", adjustedJSON)]
         await model.answerEstimate("new:0", minutes: 60)
         guard case .object(let o)? = backend.lastStreamBody else { return XCTFail() }
@@ -285,6 +286,7 @@ final class EstimateAskTests: XCTestCase {
         XCTAssertEqual(model.envelope?.proposalId, UUID(uuidString: "dddddddd-0000-0000-0000-000000000003"))
         XCTAssertEqual(model.envelope?.proposal.blocks.first?.end, "2026-11-23T22:00:00+09:00")
         XCTAssertEqual(model.pendingAsks, [])
+        XCTAssertTrue(model.message.isEmpty)
     }
 
     @MainActor

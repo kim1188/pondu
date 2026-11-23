@@ -486,6 +486,8 @@ final class AssistantModel {
         }
         for u in next.estimateUpdates { answeredEstimates[u.todoId] = u.minutes }
         envelope = next
+        // 처음 초안의 안내는 조정 전 시간표를 설명할 수 있다.
+        message = ""
         selection = ProposalSelection(for: next.proposal)
         // 답한 일은 서버가 estimate_asks 에서 뺀다. 남은 질문만 이어서 묻는다(시간은 다시 재지 않는다).
         pendingAsks = pendingAsks.filter { next.proposal.estimateAsks.contains($0) }
