@@ -144,6 +144,9 @@ const REF_EXTS = ['', '.html', '.txt', '.json'];
 //   ASSISTANT_EVAL_MOCK=oracle|null    API를 부르지 않고 모범 답/빈 답을 흘려보내 배관만 점검한다
 
 import { propose, DEFAULT_MODEL } from '../core/propose.mjs';
+import { proposeOpenAI } from '../providers/openai.mjs';
+import { openaiChatDecider, openaiDecisions } from '../decide/deciders.mjs';
+import { proposeByDeciding } from '../decide/propose.mjs';
 import { SYSTEM_PROMPT, buildUserMessage } from '../core/prompt.mjs';
 import { EMPTY_PROPOSAL } from '../core/schema.mjs';
 import { CASES } from './cases.mjs';
@@ -151,9 +154,21 @@ import { grade } from './grade.mjs';
 
 const MOCK = process.env.ASSISTANT_EVAL_MOCK;
 
+// 모델 이름으로 경로를 고른다.
+//   claude-*                     core 의 propose (Anthropic)
+//   gpt-6-luna 등 결정 모델       decide/ 의 고르기 방식 + OpenAI Decisions API
+//   그 밖(OpenAI 채팅 모델)        providers/openai.mjs. ASSISTANT_HARNESS=decide 면 채팅 모델에게 고르기 방식으로 묻는다
+// 고르기 방식은 글을 쓰지 못해 capture 를 다루지 않으므로, 그 경로에서는 배치 사례(plan_day, reschedule)만 돌린다.
+const DECISION_MODEL = /luna|jev|clef/i;
+const routeOf = model => (/^claude/i.test(model) ? 'anthropic'
+  : DECISION_MODEL.test(model) ? 'decisions'
+  : process.env.ASSISTANT_HARNESS === 'decide' ? 'chat-decide' : 'openai');
+const cliModel = (() => { const i = process.argv.indexOf('--model'); return i > 0 ? process.argv[i + 1] : undefined; })();
+const DECIDING = cliModel ? ['decisions', 'chat-decide'].includes(routeOf(cliModel)) : false;
+
 /** Return the list of input cases. Each must have a stable `id`. */
 async function loadCases() {
-  return CASES.map(c => ({
+  return CASES.filter(c => !DECIDING || c.input.kind !== 'capture').map(c => ({
     ...c,
     prompt: c.input.text || `(입력 없음: 세션 종료 후 자동 호출) ${JSON.stringify(c.input.session)}`,
   }));
@@ -168,10 +183,20 @@ async function runCase(c, ctx) {
     r = { proposal, violations: [], model, stop_reason: 'end_turn', rawText: JSON.stringify(proposal),
           usage: { input_tokens: 0, output_tokens: 0 }, system: SYSTEM_PROMPT, userMessage: buildUserMessage(c.input) };
   } else {
-    // 시험에서는 어떤 모델이 답했는지가 섞이면 안 되므로 대체 모델을 끈다.
-    r = await propose(c.input, { model, effort: process.env.ASSISTANT_EFFORT, fallbacks: false });
+    const effort = process.env.ASSISTANT_EFFORT;
+    const route = routeOf(model);
+    if (route === 'anthropic') {
+      // 시험에서는 어떤 모델이 답했는지가 섞이면 안 되므로 대체 모델을 끈다.
+      r = await propose(c.input, { model, effort, fallbacks: false });
+    } else if (route === 'openai') {
+      r = await proposeOpenAI(c.input, { model, effort });
+    } else {
+      const decider = route === 'decisions' ? openaiDecisions({ model }) : openaiChatDecider({ model, effort });
+      r = await proposeByDeciding(c.input, { decider, model });
+    }
   }
-  if (!MOCK && !(r.usage?.output_tokens > 0)) throw new Error('usage 가 비어 있음: 응답을 믿을 수 없어 채점하지 않음');
+  // 결정 모델은 출력 토큰이 0이다. 입력 토큰이라도 있어야 실제 응답으로 본다.
+  if (!MOCK && !((r.usage?.output_tokens ?? 0) + (r.usage?.input_tokens ?? 0) > 0)) throw new Error('usage 가 비어 있음: 응답을 믿을 수 없어 채점하지 않음');
   return {
     output: r.proposal, // 거절했거나 형식이 깨졌으면 null → 채점기가 0점 처리하고 이유를 남긴다
     refused: r.stop_reason === 'refusal',
@@ -181,6 +206,7 @@ async function runCase(c, ctx) {
       { role: 'assistant', content: r.rawText || `(본문 없음, stop_reason=${r.stop_reason})` },
     ],
     model: r.model, usage: r.usage, stop_reason: r.stop_reason,
+    requests: r.usage?.requests, // 고르기 방식은 사례 하나에 여러 번 묻는다
   };
 }
 
@@ -192,7 +218,7 @@ async function gradeCase(c, run, ref, ctx) {
 }
 
 /** Side-channel perf fields beyond the built-ins (latency_s etc.). */
-function perfFrom(run) { return { refused: run.refused ? 1 : 0 }; }
+function perfFrom(run) { return { refused: run.refused ? 1 : 0, requests: run.requests ?? 1 }; }
 
 // --- harness (you usually won't need to touch below this line) --------------
 
